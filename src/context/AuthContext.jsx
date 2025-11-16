@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import mockData from '../data/mockData';
 import { AUTH_ENABLED } from '../constants/featureFlags';
+import * as authApi from '../services/authApi';
 
 const AuthContext = createContext(null);
 const BYPASS_STORAGE_KEY = 'financeEduAuthBypass';
@@ -47,14 +48,40 @@ export const AuthProvider = ({ children }) => {
     // Check if there's a stored JWT token
     const storedToken = localStorage.getItem(JWT_TOKEN_KEY);
     if (storedToken) {
-      setState({
-        isAuthenticated: true,
-        user: {
-          ...baseUser,
-        },
-        ready: true,
-        bypassed: false,
-      });
+      // Fetch user info from API
+      authApi.getCurrentUser()
+        .then((userInfo) => {
+          setState({
+            isAuthenticated: true,
+            user: {
+              id: userInfo.id,
+              username: userInfo.username,
+              name: `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() || userInfo.username,
+              email: userInfo.email || userInfo.username,
+              firstName: userInfo.firstName,
+              lastName: userInfo.lastName,
+              dob: userInfo.dob,
+              phone: userInfo.phone,
+              roles: userInfo.roles || [],
+              avatar: '👤',
+              level: 1,
+              points: 0,
+            },
+            ready: true,
+            bypassed: false,
+          });
+        })
+        .catch((error) => {
+          console.error('Failed to fetch user info:', error);
+          // If token is invalid, clear it
+          authApi.removeToken();
+          setState({
+            isAuthenticated: false,
+            user: null,
+            ready: true,
+            bypassed: false,
+          });
+        });
       return;
     }
 
@@ -65,25 +92,55 @@ export const AuthProvider = ({ children }) => {
     }));
   }, []);
 
-  const login = useCallback(({ username, name, token }) => {
-    // Save token to localStorage if provided
-    if (token) {
-      localStorage.setItem(JWT_TOKEN_KEY, token);
-    }
+  const login = useCallback(async ({ username, password, token }) => {
+    try {
+      let finalToken = token;
+      
+      // If no token provided, login to get token
+      if (!finalToken && username && password) {
+        const loginResult = await authApi.login(username, password);
+        finalToken = loginResult.token;
+      }
+      
+      // Save token to localStorage
+      if (finalToken) {
+        authApi.setToken(finalToken);
+      } else {
+        throw new Error('No token received');
+      }
 
-    setState({
-      isAuthenticated: true,
-      user: {
-        ...baseUser,
-        name: name || baseUser.name,
-        email: username || baseUser.email,
-        username: username,
-      },
-      ready: true,
-      bypassed: false,
-    });
-    localStorage.removeItem(BYPASS_STORAGE_KEY);
-    return true;
+      // Fetch user info from API
+      const userInfo = await authApi.getCurrentUser();
+      
+      setState({
+        isAuthenticated: true,
+        user: {
+          id: userInfo.id,
+          username: userInfo.username,
+          name: `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() || userInfo.username,
+          email: userInfo.email || userInfo.username,
+          firstName: userInfo.firstName,
+          lastName: userInfo.lastName,
+          dob: userInfo.dob,
+          phone: userInfo.phone,
+          roles: userInfo.roles || [],
+          avatar: '👤',
+          level: 1,
+          points: 0,
+        },
+        ready: true,
+        bypassed: false,
+      });
+      
+      localStorage.removeItem(BYPASS_STORAGE_KEY);
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Đăng nhập thất bại' 
+      };
+    }
   }, []);
 
   const register = useCallback(
@@ -95,20 +152,30 @@ export const AuthProvider = ({ children }) => {
     [login]
   );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(BYPASS_STORAGE_KEY);
-    localStorage.removeItem(JWT_TOKEN_KEY);
+  const logout = useCallback(async () => {
+    try {
+      const token = authApi.getStoredToken();
+      if (token) {
+        await authApi.logout(token);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Continue with logout even if API call fails
+    } finally {
+      localStorage.removeItem(BYPASS_STORAGE_KEY);
+      authApi.removeToken();
+      
+      if (!AUTH_ENABLED) {
+        return;
+      }
 
-    if (!AUTH_ENABLED) {
-      return;
+      setState({
+        isAuthenticated: false,
+        user: null,
+        ready: true,
+        bypassed: false,
+      });
     }
-
-    setState({
-      isAuthenticated: false,
-      user: null,
-      ready: true,
-      bypassed: false,
-    });
   }, []);
 
   const enableBypass = useCallback(() => {
@@ -125,6 +192,13 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem(JWT_TOKEN_KEY);
   }, []);
 
+  const setUser = useCallback((updatedUser) => {
+    setState((prev) => ({
+      ...prev,
+      user: updatedUser,
+    }));
+  }, []);
+
   const value = useMemo(
     () => ({
       ...state,
@@ -133,9 +207,10 @@ export const AuthProvider = ({ children }) => {
       logout,
       enableBypass,
       getToken,
+      setUser,
       authEnabled: AUTH_ENABLED,
     }),
-    [state, login, register, logout, enableBypass, getToken]
+    [state, login, register, logout, enableBypass, getToken, setUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

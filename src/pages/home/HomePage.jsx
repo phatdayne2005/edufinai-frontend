@@ -2,32 +2,40 @@ import React from 'react';
 import { Plus, Target, ChevronRight, Brain } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
 
 const HomePage = () => {
-  const { user, goals, expenses } = useApp();
+  const { user: mockUser, goals, expenses } = useApp();
+  const { user: authUser } = useAuth();
   const activeGoals = goals.filter((goal) => goal.status === 'ACTIVE');
   const recentExpenses = expenses.slice(0, 3);
 
+  // Use real user name from AuthContext if available, otherwise fallback to mock data
+  const displayName = authUser?.name || authUser?.username || mockUser?.name || 'Người dùng';
+  
+  // Use mock data for financial information (balance, income, expense, savingRate)
+  const financialData = mockUser;
+
   return (
     <div style={styles.page}>
-      <Header title="Xin chào!" subtitle={`Chào mừng trở lại, ${user.name}`} />
+      <Header title="Xin chào!" subtitle={`Chào mừng trở lại, ${displayName}`} />
 
       <div style={styles.balanceCard}>
         <p style={styles.balanceLabel}>Số dư hiện tại</p>
-        <h2 style={styles.balanceAmount}>{user.balance.toLocaleString('vi-VN')} đ</h2>
+        <h2 style={styles.balanceAmount}>{financialData.balance.toLocaleString('vi-VN')} đ</h2>
         <div style={styles.balanceStats}>
           <div>
             <p style={styles.statLabel}>Thu nhập</p>
-            <p style={styles.statValue}>+{(user.income / 1000000).toFixed(1)}M</p>
+            <p style={styles.statValue}>+{(financialData.income / 1000000).toFixed(1)}M</p>
           </div>
           <div>
             <p style={styles.statLabel}>Chi tiêu</p>
-            <p style={styles.statValue}>-{(user.expense / 1000000).toFixed(1)}M</p>
+            <p style={styles.statValue}>-{(financialData.expense / 1000000).toFixed(1)}M</p>
           </div>
           <div>
             <p style={styles.statLabel}>Tiết kiệm</p>
-            <p style={styles.statValue}>{user.savingRate}%</p>
+            <p style={styles.statValue}>{financialData.savingRate}%</p>
           </div>
         </div>
       </div>

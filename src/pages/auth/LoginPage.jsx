@@ -9,7 +9,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, enableBypass, authEnabled, bypassed } = useAuth();
-  const [formState, setFormState] = useState({ username: '', password: '', name: '' });
+  const [formState, setFormState] = useState({ username: '', password: '' });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -31,88 +31,20 @@ const LoginPage = () => {
     logInfo('login', { username: formState.username }, 'Bắt đầu quá trình đăng nhập');
 
     try {
-      const requestBody = {
+      // Call login function with username and password
+      // AuthContext will handle API call, saving token and fetching user info
+      const loginResult = await login({
         username: formState.username,
         password: formState.password,
-      };
-
-      logDebug('login', {
-        url: 'http://localhost:8080/auth/token',
-        method: 'POST',
-        body: requestBody,
-      }, 'Gửi request đăng nhập');
-
-      const response = await fetch('http://localhost:8080/auth/token', {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
       });
 
-      // Log response status and headers
-      const responseHeaders = {};
-      response.headers.forEach((value, key) => {
-        responseHeaders[key] = value;
-      });
-
-      logInfo('login', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: responseHeaders,
-      }, 'Nhận được response từ server');
-
-      // Get response text first to debug
-      const responseText = await response.text();
-      logDebug('login', { responseText }, 'Response text từ server');
-
-      // Parse JSON
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        logInfo('login', data, 'Parsed JSON data thành công');
-      } catch (parseError) {
-        logError('login', {
-          parseError: parseError.message,
-          responseText: responseText,
-          status: response.status,
-        }, 'Lỗi khi parse JSON từ response');
-        throw new Error(`Lỗi khi đọc response từ server: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 100)}`);
+      if (loginResult.success) {
+        logInfo('login', { username: formState.username }, 'Đăng nhập thành công');
+        const redirectPath = location.state?.from?.pathname || '/';
+        navigate(redirectPath, { replace: true });
+      } else {
+        throw new Error(loginResult.error || 'Đăng nhập thất bại');
       }
-
-      // Check if response is successful based on status code
-      if (!response.ok) {
-        const errorMessage = data.message || data.error || data.result?.message || `Đăng nhập thất bại: ${response.status}`;
-        logError('login', data, `Response không thành công: ${errorMessage}`);
-        throw new Error(errorMessage);
-      }
-
-      // Response structure: { code: 1000, result: { token: "...", authenticated: true } }
-      const token = data.result?.token;
-
-      if (!token) {
-        logError('login', data, 'Không tìm thấy token trong response');
-        throw new Error('Không nhận được token từ server. Vui lòng kiểm tra response structure.');
-      }
-
-      logInfo('login', { tokenLength: token.length }, 'Token nhận được thành công');
-
-      // Save token to localStorage
-      localStorage.setItem('jwt_token', token);
-
-      // Call login function with token and user info
-      login({
-        username: formState.username,
-        name: formState.name || undefined,
-        token: token,
-      });
-
-      logInfo('login', { username: formState.username }, 'Đăng nhập thành công');
-
-      const redirectPath = location.state?.from?.pathname || '/';
-      navigate(redirectPath, { replace: true });
     } catch (err) {
       logError('login', {
         name: err.name,
@@ -279,22 +211,6 @@ const LoginPage = () => {
               style={styles.authInput}
               required
             />
-          </div>
-
-          <div style={styles.authField}>
-            <label htmlFor="name" style={styles.authLabel}>
-              Tên hiển thị (tuỳ chọn)
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              placeholder="Nguyễn Văn A"
-              value={formState.name}
-              onChange={handleChange}
-              style={styles.authInput}
-            />
-            <p style={styles.authHint}>Nếu để trống, hệ thống sẽ dùng tên mặc định trong dữ liệu mẫu.</p>
           </div>
 
           <button type="submit" style={styles.authButton} disabled={loading}>

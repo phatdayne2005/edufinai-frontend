@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import BottomNav from '../../components/layout/BottomNav';
 import HomePage from '../home/HomePage';
 import FinancePage from '../finance/FinancePage';
@@ -17,8 +18,16 @@ const tabComponents = {
 };
 
 const AppShell = () => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const ActivePage = tabComponents[activeTab] || HomePage;
+
+  // Handle navigation state to set active tab
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   return (
     <div style={styles.app}>

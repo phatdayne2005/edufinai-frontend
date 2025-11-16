@@ -603,6 +603,29 @@ export const styles = {
     cursor: 'pointer',
     marginTop: '20px',
   },
+  infoCard: {
+    backgroundColor: '#fff',
+    border: '1px solid #E0E0E0',
+    borderRadius: '12px',
+    padding: '16px',
+  },
+  infoRow: {
+    display: 'flex',
+    padding: '12px 0',
+    borderBottom: '1px solid #F5F5F5',
+    gap: '12px',
+  },
+  infoLabel: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#666',
+    minWidth: '120px',
+  },
+  infoValue: {
+    fontSize: '14px',
+    color: '#212121',
+    flex: 1,
+  },
   authWrapper: {
     minHeight: '100vh',
     display: 'flex',
