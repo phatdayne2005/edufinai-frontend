@@ -22,6 +22,13 @@ const PersonalInfoPage = () => {
     dob: user?.dob ? user.dob.split('T')[0] : '', // Format YYYY-MM-DD
   });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
+  const [changePasswordData, setChangePasswordData] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [changePasswordError, setChangePasswordError] = useState('');
   const [loading, setLoading] = useState(false);
   const [updateError, setUpdateError] = useState('');
 
@@ -58,6 +65,97 @@ const PersonalInfoPage = () => {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleChangePasswordInput = (field, value) => {
+    setChangePasswordData(prev => ({ ...prev, [field]: value }));
+    setChangePasswordError(''); // Clear error when user types
+  };
+
+  const handleChangePassword = async () => {
+    setChangePasswordError('');
+    setLoading(true);
+
+    try {
+      // Validation
+      if (!changePasswordData.oldPassword) {
+        setChangePasswordError('Vui lòng nhập mật khẩu cũ');
+        setLoading(false);
+        return;
+      }
+
+      if (!changePasswordData.newPassword) {
+        setChangePasswordError('Vui lòng nhập mật khẩu mới');
+        setLoading(false);
+        return;
+      }
+
+      if (changePasswordData.newPassword.length < 6) {
+        setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự');
+        setLoading(false);
+        return;
+      }
+
+      if (changePasswordData.newPassword !== changePasswordData.confirmPassword) {
+        setChangePasswordError('Mật khẩu mới và xác nhận mật khẩu không khớp');
+        setLoading(false);
+        return;
+      }
+
+      // Verify old password
+      try {
+        await authApi.login(user.username, changePasswordData.oldPassword);
+      } catch (error) {
+        setChangePasswordError('Mật khẩu cũ không đúng');
+        setLoading(false);
+        return;
+      }
+
+      // Update password
+      const updateData = {
+        password: changePasswordData.newPassword,
+      };
+
+      console.log('Changing password for user:', user.id);
+
+      const updatedUser = await authApi.updateUser(user.id, updateData);
+
+      console.log('Password changed successfully');
+
+      // Update user in context
+      const updatedUserData = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: `${updatedUser.firstName || ''} ${updatedUser.lastName || ''}`.trim() || updatedUser.username,
+        email: updatedUser.email || updatedUser.username,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        dob: updatedUser.dob,
+        phone: updatedUser.phone,
+        roles: updatedUser.roles || [],
+        avatar: user.avatar || '👤',
+        level: user.level || 1,
+        points: user.points || 0,
+      };
+      setUser(updatedUserData);
+
+      // Close dialog and reset form
+      setShowChangePasswordDialog(false);
+      setChangePasswordData({
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      setChangePasswordError('');
+
+      // Show success message (optional)
+      alert('Đổi mật khẩu thành công!');
+    } catch (error) {
+      console.error('Change password error:', error);
+      setChangePasswordError(error.message || 'Đổi mật khẩu thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -190,48 +288,38 @@ const PersonalInfoPage = () => {
             <span style={styles.infoValue}>{displayUser.username || 'N/A'}</span>
           </div>
           
-          {displayUser.firstName && (
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Họ:</span>
-              <span style={styles.infoValue}>{displayUser.firstName}</span>
-            </div>
-          )}
+          <div style={styles.infoRow}>
+            <span style={styles.infoLabel}>Họ:</span>
+            <span style={styles.infoValue}>{displayUser.firstName || 'N/A'}</span>
+          </div>
           
-          {displayUser.lastName && (
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Tên:</span>
-              <span style={styles.infoValue}>{displayUser.lastName}</span>
-            </div>
-          )}
+          <div style={styles.infoRow}>
+            <span style={styles.infoLabel}>Tên:</span>
+            <span style={styles.infoValue}>{displayUser.lastName || 'N/A'}</span>
+          </div>
           
-          {displayUser.email && (
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Email:</span>
-              <span style={styles.infoValue}>{displayUser.email}</span>
-            </div>
-          )}
+          <div style={styles.infoRow}>
+            <span style={styles.infoLabel}>Email:</span>
+            <span style={styles.infoValue}>{displayUser.email || 'N/A'}</span>
+          </div>
           
-          {displayUser.phone && (
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Số điện thoại:</span>
-              <span style={styles.infoValue}>{displayUser.phone}</span>
-            </div>
-          )}
+          <div style={styles.infoRow}>
+            <span style={styles.infoLabel}>Số điện thoại:</span>
+            <span style={styles.infoValue}>{displayUser.phone || 'N/A'}</span>
+          </div>
           
-          {displayUser.dob && (
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Ngày sinh:</span>
-              <span style={styles.infoValue}>
-                {new Date(displayUser.dob).toLocaleDateString('vi-VN')}
-              </span>
-            </div>
-          )}
+          <div style={styles.infoRow}>
+            <span style={styles.infoLabel}>Ngày sinh:</span>
+            <span style={styles.infoValue}>
+              {displayUser.dob ? new Date(displayUser.dob).toLocaleDateString('vi-VN') : 'N/A'}
+            </span>
+          </div>
           
-          {displayUser.roles && displayUser.roles.length > 0 && (
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Vai trò:</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flex: 1 }}>
-                {displayUser.roles.map((role, index) => (
+          <div style={styles.infoRow}>
+            <span style={styles.infoLabel}>Vai trò:</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flex: 1 }}>
+              {displayUser.roles && displayUser.roles.length > 0 ? (
+                displayUser.roles.map((role, index) => (
                   <span
                     key={index}
                     style={{
@@ -246,10 +334,12 @@ const PersonalInfoPage = () => {
                   >
                     {role.name}
                   </span>
-                ))}
-              </div>
+                ))
+              ) : (
+                <span style={styles.infoValue}>N/A</span>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </>
@@ -424,18 +514,32 @@ const PersonalInfoPage = () => {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => setShowConfirmDialog(true)}
-          style={{
-            ...styles.logoutButton,
-            backgroundColor: '#4CAF50',
-            marginTop: '20px',
-          }}
-          disabled={loading}
-        >
-          {loading ? 'Đang cập nhật...' : 'Cập nhật'}
-        </button>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+          <button
+            type="button"
+            onClick={() => setShowChangePasswordDialog(true)}
+            style={{
+              ...styles.logoutButton,
+              backgroundColor: '#2196F3',
+              flex: 1,
+            }}
+            disabled={loading}
+          >
+            Đổi mật khẩu
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowConfirmDialog(true)}
+            style={{
+              ...styles.logoutButton,
+              backgroundColor: '#4CAF50',
+              flex: 1,
+            }}
+            disabled={loading}
+          >
+            {loading ? 'Đang cập nhật...' : 'Cập nhật'}
+          </button>
+        </div>
       </div>
     );
   };
@@ -617,6 +721,152 @@ const PersonalInfoPage = () => {
                 {loading ? 'Đang cập nhật...' : 'Xác nhận'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Dialog */}
+      {showChangePasswordDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+        }}>
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: '0 0 20px 0',
+              color: '#212121',
+            }}>
+              Đổi mật khẩu
+            </h3>
+
+            {changePasswordError && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#FFEBEE',
+                border: '1px solid #F44336',
+                borderRadius: '8px',
+                color: '#F44336',
+                fontSize: '14px',
+                marginBottom: '16px',
+              }}>
+                {changePasswordError}
+              </div>
+            )}
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleChangePassword();
+            }} style={styles.authForm}>
+              <div style={styles.authField}>
+                <label htmlFor="oldPassword" style={styles.authLabel}>
+                  Mật khẩu cũ <span style={{ color: '#F44336' }}>*</span>
+                </label>
+                <input
+                  id="oldPassword"
+                  type="password"
+                  value={changePasswordData.oldPassword}
+                  onChange={(e) => handleChangePasswordInput('oldPassword', e.target.value)}
+                  placeholder="Nhập mật khẩu cũ"
+                  style={styles.authInput}
+                  required
+                />
+              </div>
+
+              <div style={styles.authField}>
+                <label htmlFor="newPassword" style={styles.authLabel}>
+                  Mật khẩu mới <span style={{ color: '#F44336' }}>*</span>
+                </label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  value={changePasswordData.newPassword}
+                  onChange={(e) => handleChangePasswordInput('newPassword', e.target.value)}
+                  placeholder="Tối thiểu 6 ký tự"
+                  style={styles.authInput}
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div style={styles.authField}>
+                <label htmlFor="confirmPassword" style={styles.authLabel}>
+                  Xác nhận mật khẩu mới <span style={{ color: '#F44336' }}>*</span>
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={changePasswordData.confirmPassword}
+                  onChange={(e) => handleChangePasswordInput('confirmPassword', e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới"
+                  style={styles.authInput}
+                  required
+                />
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end',
+                marginTop: '20px',
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePasswordDialog(false);
+                    setChangePasswordData({
+                      oldPassword: '',
+                      newPassword: '',
+                      confirmPassword: '',
+                    });
+                    setChangePasswordError('');
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#f5f5f5',
+                    border: '1px solid #E0E0E0',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#212121',
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#2196F3',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    color: '#fff',
+                    fontWeight: '600',
+                  }}
+                >
+                  {loading ? 'Đang xử lý...' : 'Đổi mật khẩu'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
