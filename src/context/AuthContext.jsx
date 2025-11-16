@@ -11,6 +11,7 @@ import { AUTH_ENABLED } from '../constants/featureFlags';
 
 const AuthContext = createContext(null);
 const BYPASS_STORAGE_KEY = 'financeEduAuthBypass';
+const JWT_TOKEN_KEY = 'jwt_token';
 const baseUser = mockData.user;
 
 const initialState = {
@@ -43,6 +44,20 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
+    // Check if there's a stored JWT token
+    const storedToken = localStorage.getItem(JWT_TOKEN_KEY);
+    if (storedToken) {
+      setState({
+        isAuthenticated: true,
+        user: {
+          ...baseUser,
+        },
+        ready: true,
+        bypassed: false,
+      });
+      return;
+    }
+
     setState((prev) => ({
       ...prev,
       ready: true,
@@ -50,13 +65,19 @@ export const AuthProvider = ({ children }) => {
     }));
   }, []);
 
-  const login = useCallback(({ email, name }) => {
+  const login = useCallback(({ username, name, token }) => {
+    // Save token to localStorage if provided
+    if (token) {
+      localStorage.setItem(JWT_TOKEN_KEY, token);
+    }
+
     setState({
       isAuthenticated: true,
       user: {
         ...baseUser,
         name: name || baseUser.name,
-        email,
+        email: username || baseUser.email,
+        username: username,
       },
       ready: true,
       bypassed: false,
@@ -76,6 +97,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     localStorage.removeItem(BYPASS_STORAGE_KEY);
+    localStorage.removeItem(JWT_TOKEN_KEY);
 
     if (!AUTH_ENABLED) {
       return;
@@ -99,6 +121,10 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
+  const getToken = useCallback(() => {
+    return localStorage.getItem(JWT_TOKEN_KEY);
+  }, []);
+
   const value = useMemo(
     () => ({
       ...state,
@@ -106,9 +132,10 @@ export const AuthProvider = ({ children }) => {
       register,
       logout,
       enableBypass,
+      getToken,
       authEnabled: AUTH_ENABLED,
     }),
-    [state, login, register, logout, enableBypass]
+    [state, login, register, logout, enableBypass, getToken]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
