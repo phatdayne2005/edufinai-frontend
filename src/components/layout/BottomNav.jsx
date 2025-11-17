@@ -2,7 +2,7 @@ import React from 'react';
 import { styles } from '../../styles/appStyles';
 
 const BottomNav = ({ activeTab, onChange, tabs }) => (
-  <nav style={styles.bottomNav}>
+  <nav style={styles.bottomNav} className="app-shell__bottom-nav">
     {tabs.map(({ id, icon: Icon, label }) => (
       <button
         key={id}
