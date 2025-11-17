@@ -241,3 +241,79 @@ export const getStoredToken = () => {
     return getToken();
 };
 
+// ============================================================================
+// Admin APIs - Quản lý users (chỉ dành cho ADMIN)
+// ============================================================================
+
+/**
+ * Admin - Create User with Role - Tạo user mới với role
+ * API: POST http://localhost:8080/auth/users/admin/users
+ * Request: { username: string, password: string, firstName?: string, lastName?: string, email?: string, phone?: string, dob?: string, role: string }
+ * Role: LEARNER, CREATOR, MOD, hoặc ADMIN
+ * Response: { code: 1000, result: { ...userInfo } }
+ */
+export const createUserWithRole = async (userData) => {
+    const response = await apiRequest('/users/admin/users', {
+        method: 'POST',
+        body: userData,
+    }, true);
+    return response.result;
+};
+
+/**
+ * Admin - Get All Users - Lấy danh sách tất cả users
+ * API: GET http://localhost:8080/auth/users
+ * Response: { code: 1000, result: [{ ...userInfo }] }
+ */
+export const getAllUsers = async () => {
+    const response = await apiRequest('/users', {
+        method: 'GET',
+    }, true);
+    return response.result;
+};
+
+/**
+ * Admin - Get User by Id - Lấy thông tin user theo ID
+ * API: GET http://localhost:8080/auth/users/{userId}
+ * Response: { code: 1000, result: { ...userInfo } }
+ */
+export const getUserById = async (userId) => {
+    const response = await apiRequest(`/users/${userId}`, {
+        method: 'GET',
+    }, true);
+    return response.result;
+};
+
+/**
+ * Admin - Update User - Cập nhật user (admin có thể cập nhật bất kỳ user nào)
+ * API: PUT http://localhost:8080/auth/users/{userId}
+ * Request: { password?: string, firstName?: string, lastName?: string, email?: string, phone?: string, dob?: string, roles?: string[] }
+ * Note: roles phải là array, ví dụ: ["LEARNER"] hoặc ["ADMIN"]
+ * Response: { code: 1000, result: { ...userInfo } }
+ */
+export const adminUpdateUser = async (userId, userData) => {
+    // Convert role string to roles array if needed
+    const updateData = { ...userData };
+    if (updateData.role && !updateData.roles) {
+        updateData.roles = [updateData.role];
+        delete updateData.role;
+    }
+    const response = await apiRequest(`/users/${userId}`, {
+        method: 'PUT',
+        body: updateData,
+    }, true);
+    return response.result;
+};
+
+/**
+ * Admin - Delete User - Xóa user
+ * API: DELETE http://localhost:8080/auth/users/{userId}
+ * Response: { code: 1000, result: "User has been deleted" }
+ */
+export const adminDeleteUser = async (userId) => {
+    const response = await apiRequest(`/users/${userId}`, {
+        method: 'DELETE',
+    }, true);
+    return response.result;
+};
+
