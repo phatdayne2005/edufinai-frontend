@@ -110,9 +110,20 @@ const apiRequest = async (endpoint, options = {}, requireAuth = false) => {
     };
 
     if (options.body) {
-        config.body = typeof options.body === 'string'
-            ? options.body
-            : JSON.stringify(options.body);
+        if (typeof options.body === 'string') {
+            config.body = options.body;
+        } else {
+            // Remove null and undefined values from body to prevent data loss
+            const cleanedBody = Object.keys(options.body).reduce((acc, key) => {
+                const value = options.body[key];
+                // Only include non-null, non-undefined values
+                if (value !== null && value !== undefined) {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {});
+            config.body = JSON.stringify(cleanedBody);
+        }
         console.log('Request body:', config.body);
     }
 
