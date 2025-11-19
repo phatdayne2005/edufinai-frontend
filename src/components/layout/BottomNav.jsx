@@ -8,12 +8,11 @@ const BottomNav = ({ activeTab, onChange, tabs }) => (
         key={id}
         type="button"
         onClick={() => onChange(id)}
-        style={{
-          ...styles.navButton,
-          color: activeTab === id ? '#4CAF50' : '#666',
-        }}
+        className="bottom-nav__button"
+        data-active={activeTab === id}
+        style={styles.navButton}
       >
-        <Icon size={24} />
+        <Icon size={24} className="icon-hover" />
         <span style={styles.navLabel}>{label}</span>
       </button>
     ))}

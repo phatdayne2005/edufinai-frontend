@@ -44,11 +44,15 @@ const HomePage = () => {
 
           <div style={styles.quickActions}>
             <button type="button" style={styles.quickActionBtn}>
-              <Plus size={24} />
+              <div style={styles.quickActionIconWrap}>
+                <Plus size={18} />
+              </div>
               <span>Thêm thu chi</span>
             </button>
             <button type="button" style={styles.quickActionBtn}>
-              <Target size={24} />
+              <div style={styles.quickActionIconWrap}>
+                <Target size={18} />
+              </div>
               <span>Mục tiêu mới</span>
             </button>
           </div>

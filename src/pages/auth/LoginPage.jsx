@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
-import { logInfo, logError, logDebug, exportLogs, clearLogs, getLogs } from '../../utils/logger';
+import { logInfo, logError, exportLogs, clearLogs, getLogs } from '../../utils/logger';
 import { testAuth } from '../../utils/apiTest';
 
 const LoginPage = () => {
@@ -75,6 +75,9 @@ const LoginPage = () => {
 
   return (
     <div style={styles.authWrapper}>
+      <div style={styles.authSpectrum} aria-hidden />
+      <div style={styles.authBackdrop} aria-hidden />
+      <div style={styles.authBackdropGlow} aria-hidden />
       <div style={styles.authCard}>
         <h1 style={styles.authTitle}>Đăng nhập</h1>
         <p style={styles.authSubtitle}>

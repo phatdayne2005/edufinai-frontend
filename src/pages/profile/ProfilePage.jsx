@@ -4,6 +4,7 @@ import { Brain, ChevronRight } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
+import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
 
 const menuItems = [
   { icon: '🔔', label: 'Thông báo' },
@@ -102,6 +103,9 @@ const ProfilePage = () => {
           </p>
         </div>
       </div>
+
+      {/* Theme Customizer */}
+      <ThemeCustomizer />
 
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>Cài đặt</h3>
