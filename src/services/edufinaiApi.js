@@ -1,9 +1,31 @@
 /**
  * EduFinAI Service API
- * Base URL: http://localhost:8080
+ * Gateway Base URL: http://localhost:8080
+ * All AI endpoints must be called under /ai/**
  */
 
 const EDUFINAI_BASE_URL = 'http://localhost:8080';
+const EDUFINAI_GATEWAY_PREFIX = '/ai';
+const JWT_TOKEN_KEY = 'jwt_token';
+
+const buildAuthHeaders = () => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const token = window.localStorage.getItem(JWT_TOKEN_KEY);
+    if (token && token.trim() !== '') {
+      return {
+        Authorization: `Bearer ${token}`,
+      };
+    }
+  } catch (error) {
+    console.warn('[EduFinAI API] Unable to read JWT token from storage:', error);
+  }
+
+  return {};
+};
 
 /**
  * Make API request to EduFinAI service
@@ -12,6 +34,7 @@ const apiRequest = async (endpoint, options = {}) => {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    ...buildAuthHeaders(),
     ...options.headers,
   };
 
@@ -29,7 +52,10 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 
   try {
-    const response = await fetch(`${EDUFINAI_BASE_URL}${endpoint}`, config);
+    const response = await fetch(
+      `${EDUFINAI_BASE_URL}${EDUFINAI_GATEWAY_PREFIX}${endpoint}`,
+      config
+    );
 
     const data = await response.json();
 
@@ -54,6 +80,102 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
+const stripMarkdownCodeFence = (value = '') => {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('```')) {
+    return trimmed;
+  }
+
+  const lines = trimmed.split('\n');
+  const startIndex = lines[0].startsWith('```') ? 1 : 0;
+  const endIndex = lines[lines.length - 1].trim().endsWith('```') ? lines.length - 1 : lines.length;
+  return lines.slice(startIndex, endIndex).join('\n').trim();
+};
+
+const filterEmptyString = (value) => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return trimmed || '';
+};
+
+const filterStringArray = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item !== '');
+};
+
+const parseLegacyAnswerJson = (answerJson) => {
+  try {
+    if (typeof answerJson === 'string' && answerJson.trim() !== '') {
+      const jsonString = stripMarkdownCodeFence(answerJson);
+      return JSON.parse(jsonString);
+    }
+    if (answerJson && typeof answerJson === 'object') {
+      return answerJson;
+    }
+  } catch (error) {
+    console.error('[EduFinAI API] Failed to parse legacy answerJson:', error);
+  }
+  return null;
+};
+
+const extractAnswerSections = (payload = {}) => {
+  let answer = filterEmptyString(payload.formattedContent || payload.formattedAnswer || payload.answer);
+  let tips = filterStringArray(payload.tips);
+  let disclaimers = filterStringArray(payload.disclaimers);
+
+  if (!answer && tips.length === 0 && disclaimers.length === 0 && payload.answerJson) {
+    const legacyParsed = parseLegacyAnswerJson(payload.answerJson);
+    if (legacyParsed) {
+      answer = filterEmptyString(legacyParsed.answer);
+      tips = filterStringArray(legacyParsed.tips);
+      disclaimers = filterStringArray(legacyParsed.disclaimers);
+    } else if (typeof payload.answerJson === 'string') {
+      const fallback = payload.answerJson.trim();
+      if (fallback && !fallback.startsWith('{') && !fallback.startsWith('[') && !fallback.startsWith('```')) {
+        answer = fallback;
+      }
+    }
+  }
+
+  return { answer, tips, disclaimers };
+};
+
+const buildMessageContent = ({ answer, tips, disclaimers }, fallbackText = '') => {
+  let fullContent = '';
+
+  if (answer) {
+    fullContent += answer;
+  }
+
+  if (tips.length > 0) {
+    if (fullContent && !/[.!?]$/.test(fullContent)) {
+      fullContent += '.';
+    }
+    if (fullContent) {
+      fullContent += '\n\n';
+    }
+    tips.forEach((tip, index) => {
+      if (index > 0) fullContent += '\n';
+      fullContent += `• ${tip}`;
+    });
+  }
+
+  if (disclaimers.length > 0) {
+    if (fullContent) {
+      fullContent += '\n\n';
+    }
+    disclaimers.forEach((disclaimer, index) => {
+      if (index > 0) fullContent += '\n';
+      fullContent += `⚠️ ${disclaimer}`;
+    });
+  }
+
+  const finalContent = fullContent.trim() || filterEmptyString(fallbackText);
+  return finalContent;
+};
+
 /**
  * Chat API
  */
@@ -61,18 +183,26 @@ const apiRequest = async (endpoint, options = {}) => {
 /**
  * Ask a question to the AI advisor
  * @param {string} question - The question to ask
+ * @param {string} context - Optional context preset (SPENDING_WIDGET, SAVING_WIDGET, GOAL_WIDGET)
  * @param {string} userId - Optional user ID (defaults to "anonymous")
  * @param {string} conversationId - Optional conversation ID to continue existing conversation
  * @returns {Promise<Object>} Response with answer, tips, disclaimers, and conversationId
  */
-export const askQuestion = async (question, userId = null, conversationId = null) => {
-  if (!question || question.trim() === '') {
-    throw new Error('Question cannot be blank');
+export const askQuestion = async (question, userId = null, conversationId = null, context = null) => {
+  const hasQuestion = typeof question === 'string' && question.trim() !== '';
+  const hasContext = typeof context === 'string' && context.trim() !== '';
+
+  if (!hasQuestion && !hasContext) {
+    throw new Error('Question or context must be provided');
   }
 
   const body = {
-    question: question.trim(),
+    ...(hasQuestion ? { question: question.trim() } : {}),
   };
+
+  if (hasContext) {
+    body.context = context.trim();
+  }
 
   if (userId) {
     body.userId = userId;
@@ -83,102 +213,27 @@ export const askQuestion = async (question, userId = null, conversationId = null
   }
 
   console.log('[EduFinAI API] Sending request:', {
-    endpoint: '/api/chat/ask',
+    endpoint: '/chat/ask',
     body,
   });
 
-  const response = await apiRequest('/api/chat/ask', {
+  const response = await apiRequest('/chat/ask', {
     method: 'POST',
     body,
   });
 
   console.log('[EduFinAI API] Raw response received:', response);
 
-  // API trả về answerJson là một JSON string, cần parse
-  // Format: { "answer": "...", "tips": [...], "disclaimers": [...] }
-  // Có thể chứa markdown code block như ```json ... ```
-  let parsedAnswer = null;
-  try {
-    let jsonString = response.answerJson;
-    
-    // Nếu là string, xử lý markdown code block nếu có
-    if (typeof jsonString === 'string' && jsonString.trim() !== '') {
-      // Loại bỏ markdown code block nếu có (```json ... ``` hoặc ``` ... ```)
-      jsonString = jsonString.trim();
-      if (jsonString.startsWith('```')) {
-        // Tìm và loại bỏ opening và closing code block
-        const lines = jsonString.split('\n');
-        const startIndex = lines[0].startsWith('```') ? 1 : 0;
-        const endIndex = lines[lines.length - 1].trim().endsWith('```') ? lines.length - 1 : lines.length;
-        jsonString = lines.slice(startIndex, endIndex).join('\n').trim();
-      }
-      
-      // Parse JSON
-      parsedAnswer = JSON.parse(jsonString);
-      console.log('[EduFinAI API] Parsed answerJson:', parsedAnswer);
-    } else if (typeof response.answerJson === 'object' && response.answerJson !== null) {
-      // Nếu đã là object rồi thì dùng luôn
-      parsedAnswer = response.answerJson;
-    }
-  } catch (e) {
-    console.error('[EduFinAI API] Failed to parse answerJson:', e);
-    console.error('[EduFinAI API] Raw answerJson value:', response.answerJson);
-    // Nếu parse thất bại, parsedAnswer vẫn là null
-    parsedAnswer = null;
+  const sections = extractAnswerSections(response);
+
+  if (!sections.answer && sections.tips.length === 0 && sections.disclaimers.length === 0) {
+    throw new Error('Không thể xử lý phản hồi từ AI. Vui lòng thử lại sau.');
   }
 
-  // Helper function để lọc bỏ các giá trị rỗng trong array
-  const filterEmptyArray = (arr) => {
-    if (!Array.isArray(arr)) return [];
-    return arr.filter(item => {
-      if (typeof item === 'string') {
-        return item.trim() !== '';
-      }
-      return item != null && item !== '';
-    });
-  };
-
-  // Helper function để lọc bỏ string rỗng
-  const filterEmptyString = (str) => {
-    if (typeof str !== 'string') return '';
-    const trimmed = str.trim();
-    return trimmed !== '' ? trimmed : '';
-  };
-
-  // Trả về response với các field đã được parse và lọc
-  let result = {
+  const result = {
     ...response,
-    // Lấy answer từ parsedAnswer nếu có
-    answer: parsedAnswer?.answer ? filterEmptyString(parsedAnswer.answer) : '',
-    // Lọc tips: chỉ giữ lại các item không rỗng
-    tips: parsedAnswer?.tips ? filterEmptyArray(parsedAnswer.tips) : [],
-    // Lọc disclaimers: chỉ giữ lại các item không rỗng
-    disclaimers: parsedAnswer?.disclaimers ? filterEmptyArray(parsedAnswer.disclaimers) : [],
-    // Giữ nguyên raw answerJson để debug
-    rawAnswerJson: response.answerJson,
+    ...sections,
   };
-  
-  // Nếu parse thất bại và không có dữ liệu hợp lệ, thử fallback
-  if (!result.answer && result.tips.length === 0 && result.disclaimers.length === 0) {
-    console.warn('[EduFinAI API] Warning: Could not parse answerJson, trying fallback');
-    
-    // Fallback: Nếu answerJson là string và không phải JSON, dùng nó như answer
-    if (typeof response.answerJson === 'string' && response.answerJson.trim() !== '') {
-      const trimmed = response.answerJson.trim();
-      // Nếu không phải JSON format (không bắt đầu bằng { hoặc [), dùng như text thuần
-      if (!trimmed.startsWith('{') && !trimmed.startsWith('[') && !trimmed.startsWith('```')) {
-        console.log('[EduFinAI API] Using answerJson as plain text fallback');
-        result.answer = trimmed;
-      } else {
-        // Nếu là JSON string nhưng parse thất bại, log chi tiết
-        console.error('[EduFinAI API] Failed to parse answerJson:', {
-          rawValue: response.answerJson,
-          length: response.answerJson?.length,
-          firstChars: response.answerJson?.substring(0, 100),
-        });
-      }
-    }
-  }
 
   console.log('[EduFinAI API] Final processed response:', result);
   return result;
@@ -191,8 +246,8 @@ export const askQuestion = async (question, userId = null, conversationId = null
  */
 export const getUserConversations = async (userId = null) => {
   const endpoint = userId
-    ? `/api/chat/conversations?userId=${encodeURIComponent(userId)}`
-    : '/api/chat/conversations';
+    ? `/chat/conversations?userId=${encodeURIComponent(userId)}`
+    : '/chat/conversations';
 
   const response = await apiRequest(endpoint);
   
@@ -210,68 +265,18 @@ export const getConversationHistory = async (conversationId) => {
     throw new Error('ConversationId is required');
   }
 
-  const response = await apiRequest(`/api/chat/conversations/${conversationId}`);
+  const response = await apiRequest(`/chat/conversations/${conversationId}`);
   
   // Process messages to format them properly
   if (response.messages && Array.isArray(response.messages)) {
     response.messages = response.messages.map(msg => {
-      // Parse answerJson if it exists
-      let parsedAnswer = null;
-      if (msg.answerJson) {
-        try {
-          let jsonString = msg.answerJson;
-          if (typeof jsonString === 'string' && jsonString.trim() !== '') {
-            jsonString = jsonString.trim();
-            if (jsonString.startsWith('```')) {
-              const lines = jsonString.split('\n');
-              const startIndex = lines[0].startsWith('```') ? 1 : 0;
-              const endIndex = lines[lines.length - 1].trim().endsWith('```') ? lines.length - 1 : lines.length;
-              jsonString = lines.slice(startIndex, endIndex).join('\n').trim();
-            }
-            parsedAnswer = JSON.parse(jsonString);
-          }
-        } catch (e) {
-          console.error('[EduFinAI API] Failed to parse message answerJson:', e);
-        }
-      }
-
-      // Format message content like in askQuestion
-      let fullContent = '';
-      const answer = parsedAnswer?.answer || msg.answer || '';
-      const tips = parsedAnswer?.tips || msg.tips || [];
-      const disclaimers = parsedAnswer?.disclaimers || msg.disclaimers || [];
-
-      if (answer) {
-        fullContent += answer;
-      }
-
-      if (tips.length > 0) {
-        if (fullContent && !fullContent.endsWith('.') && !fullContent.endsWith('!') && !fullContent.endsWith('?')) {
-          fullContent += '.';
-        }
-        if (fullContent) {
-          fullContent += '\n\n';
-        }
-        tips.forEach((tip, index) => {
-          if (index > 0) fullContent += '\n';
-          fullContent += `• ${tip}`;
-        });
-      }
-
-      if (disclaimers.length > 0) {
-        if (fullContent) {
-          fullContent += '\n\n';
-        }
-        disclaimers.forEach((disclaimer, index) => {
-          if (index > 0) fullContent += '\n';
-          fullContent += `⚠️ ${disclaimer}`;
-        });
-      }
-
+      const sections = extractAnswerSections(msg);
+      const fullContent = buildMessageContent(sections, msg.content);
       return {
         ...msg,
-        content: fullContent.trim() || answer,
-        formattedContent: fullContent.trim(),
+        ...sections,
+        content: fullContent,
+        formattedContent: fullContent,
       };
     });
   }
@@ -289,7 +294,7 @@ export const deleteConversation = async (conversationId) => {
     throw new Error('ConversationId is required');
   }
 
-  const response = await apiRequest(`/api/chat/conversations/${conversationId}`, {
+  const response = await apiRequest(`/chat/conversations/${conversationId}`, {
     method: 'DELETE',
   });
 
@@ -307,8 +312,8 @@ export const deleteConversation = async (conversationId) => {
  */
 export const getDailyReport = async (date = null) => {
   const endpoint = date
-    ? `/api/reports/daily?date=${date}`
-    : '/api/reports/daily';
+    ? `/reports/daily?date=${date}`
+    : '/reports/daily';
 
   const response = await apiRequest(endpoint);
 
@@ -329,7 +334,7 @@ export const getDailyReport = async (date = null) => {
  * @returns {Promise<Object>} Generated daily report
  */
 export const generateDailyReport = async () => {
-  return apiRequest('/api/reports/daily/generate', {
+  return apiRequest('/reports/daily/generate', {
     method: 'POST',
   });
 };

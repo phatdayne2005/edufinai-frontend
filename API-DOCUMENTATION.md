@@ -26,9 +26,11 @@ http://localhost:8080
 
 ## Authentication
 
-Hiện tại API không yêu cầu authentication. Tuy nhiên, cần đảm bảo:
-- **Gemini API Key** được cấu hình qua environment variable `GEMINI_API_KEY`
-- **CORS** được cấu hình cho các origin được phép
+- **Tất cả** endpoint (trừ `/actuator/health`) yêu cầu JWT hợp lệ do `auth-service` phát hành và được Gateway kiểm tra.
+- Frontend phải gọi qua Gateway (`http://localhost:8080/...`) và đính kèm header `Authorization: Bearer <JWT>`.
+- Token có thể lấy từ API `POST http://localhost:9000/identity/auth/token`.
+- `ai-service` hoạt động như Resource Server (HS512), nên chỉ cần Gateway forward JWT là đủ.
+- Đảm bảo cấu hình CORS/Gateway đã sẵn sàng để browser gửi kèm header Authorization.
 
 ---
 
@@ -57,6 +59,7 @@ Gửi câu hỏi tư vấn tài chính và nhận phản hồi từ AI. API tự
 
 **Request Headers:**
 ```
+Authorization: Bearer <JWT>
 Content-Type: application/json
 Accept: application/json
 ```
@@ -64,18 +67,20 @@ Accept: application/json
 **Request Body:**
 ```json
 {
-  "userId": "string (optional)",
+  "userId": "string (optional, sẽ bị override bởi JWT)",
   "conversationId": "string (optional)",
-  "question": "string (required)"
+  "question": "string (required nếu không có context)",
+  "context": "string (optional - preset cho widget)"
 }
 ```
 
 **Request Schema:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `userId` | string | No | ID của người dùng. Nếu không có, mặc định là "anonymous" |
+| `userId` | string | No | Không còn sử dụng: backend luôn lấy userId từ JWT |
 | `conversationId` | string | No | ID của conversation để tiếp tục cuộc hội thoại cũ. Nếu không có, sẽ tạo conversation mới |
-| `question` | string | Yes | Câu hỏi cần tư vấn (không được để trống) |
+| `question` | string | Yes* | Câu hỏi cần tư vấn. Có thể để trống nếu gửi `context` preset |
+| `context` | string | No | Giá trị preset: `SPENDING_WIDGET`, `SAVING_WIDGET`, `GOAL_WIDGET` dùng để sinh nội dung cho 3 thẻ Tư vấn AI |
 
 **Response:** `200 OK`
 
@@ -99,7 +104,7 @@ Accept: application/json
 **Response Schema:**
 | Field | Type | Description |
 |-------|------|-------------|
-| `userId` | string | ID người dùng (hoặc "anonymous") |
+| `userId` | string | ID người dùng (được lấy từ JWT) |
 | `question` | string | Câu hỏi đã gửi |
 | `conversationId` | string | ID của conversation (dùng để tiếp tục cuộc hội thoại) |
 | `answer` | string | Câu trả lời chính từ AI |
@@ -115,14 +120,20 @@ Accept: application/json
 1. Nếu có `conversationId`, API sẽ lấy lịch sử conversation (10 messages gần nhất) và đưa vào context cho AI
 2. Nếu không có `conversationId`, API sẽ tạo conversation mới
 3. API tự động fetch dữ liệu từ các downstream services (nếu có):
-   - Transaction Service: `http://localhost:8081/api/summary/daily`
-   - User Profile Service: `http://localhost:8082/api/summary/daily`
-   - Goals Service: `http://localhost:8083/api/summary/daily`
-   - Learning Service: `http://localhost:8084/api/summary/daily`
+   - Transaction Service: `http://finance-service/api/summary/daily`
+   - User Profile Service: `http://auth-service/api/summary/daily`
+   - Goals Service: `http://gamification-service/api/summary/daily`
+   - Learning Service: `http://learning-service/api/summary/daily`
 4. Dữ liệu và lịch sử được đưa vào context cho AI
 5. AI xử lý và trả về JSON response
 6. Response được sanitize (loại bỏ thông tin nhạy cảm như số thẻ tín dụng, SSN, từ ngữ không phù hợp)
-7. Message được lưu vào database (async, không block response)
+7. Message được lưu vào database (trừ trường hợp gọi với `context` thuộc nhóm widget, xem bên dưới)
+
+##### Chế độ widget (`context`)
+- Dùng để render 3 thẻ nhỏ trong màn Cá nhân mà không muốn lưu lịch sử.
+- Giá trị hợp lệ: `SPENDING_WIDGET`, `SAVING_WIDGET`, `GOAL_WIDGET`.
+- Khi gửi `context`, có thể để trống `question`; backend sẽ tự tạo prompt theo preset và **không lưu** kết quả vào `chat_history`.
+- Mỗi widget nên dùng conversationId cố định riêng (hoặc bỏ trống) vì lịch sử không được lưu.
 
 **Timeout:**
 - Downstream services: 5 giây
@@ -131,9 +142,9 @@ Accept: application/json
 **Example Request - Tạo conversation mới:**
 ```bash
 curl -X POST http://localhost:8080/api/chat/ask \
+  -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" \
   -d '{
-    "userId": "user123",
     "question": "Tôi nên tiết kiệm bao nhiêu mỗi tháng?"
   }'
 ```
@@ -164,11 +175,22 @@ curl -X POST http://localhost:8080/api/chat/ask \
 **Example Request - Tiếp tục conversation:**
 ```bash
 curl -X POST http://localhost:8080/api/chat/ask \
+  -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" \
   -d '{
-    "userId": "user123",
     "conversationId": "550e8400-e29b-41d4-a716-446655440000",
     "question": "Làm thế nào để tăng tiết kiệm lên 30%?"
+  }'
+```
+
+**Example Request - Widget (không lưu lịch sử):**
+```bash
+curl -X POST http://localhost:8080/api/chat/ask \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "conversationId": "advisor-spending",
+    "context": "SPENDING_WIDGET"
   }'
 ```
 
@@ -199,14 +221,11 @@ curl -X POST http://localhost:8080/api/chat/ask \
 Lấy danh sách tất cả conversations của một user, sắp xếp theo thời gian cập nhật mới nhất.
 
 **Endpoint:** `GET /api/chat/conversations`
-
-**Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `userId` | string | No | ID của user. Nếu không có, mặc định là "anonymous" |
+> User ID được lấy từ JWT, không cần query param.
 
 **Request Headers:**
 ```
+Authorization: Bearer <JWT>
 Accept: application/json
 ```
 
@@ -240,7 +259,8 @@ Accept: application/json
 
 **Example Request:**
 ```bash
-curl -X GET "http://localhost:8080/api/chat/conversations?userId=user123"
+curl -X GET "http://localhost:8080/api/chat/conversations" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
 **Example Response:**
@@ -282,6 +302,7 @@ Lấy toàn bộ lịch sử messages của một conversation cụ thể.
 
 **Request Headers:**
 ```
+Authorization: Bearer <JWT>
 Accept: application/json
 ```
 
@@ -336,7 +357,8 @@ Accept: application/json
 
 **Example Request:**
 ```bash
-curl -X GET "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000"
+curl -X GET "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
 **Example Response:**
@@ -403,6 +425,7 @@ Xóa một conversation (xóa tất cả messages trong conversation đó).
 
 **Request Headers:**
 ```
+Authorization: Bearer <JWT>
 Accept: application/json
 ```
 
@@ -426,7 +449,8 @@ Accept: application/json
 
 **Example Request:**
 ```bash
-curl -X DELETE "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000"
+curl -X DELETE "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
 **Example Response:**
@@ -471,6 +495,7 @@ Lấy báo cáo tóm tắt tài chính & học tập theo ngày.
 
 **Request Headers:**
 ```
+Authorization: Bearer <JWT>
 Accept: application/json
 ```
 
@@ -483,6 +508,9 @@ Accept: application/json
   "model": "gemini-2.5-flash",
   "rawSummary": "string",
   "sanitizedSummary": "string",
+  "insight": "string",
+  "rootCause": "string",
+  "priorityAction": "string",
   "usagePromptTokens": 0,
   "usageCompletionTokens": 0,
   "usageTotalTokens": 0,
@@ -496,27 +524,26 @@ Accept: application/json
 |-------|------|-------------|
 | `reportDate` | string (ISO 8601) | Ngày của report |
 | `model` | string | Model Gemini được sử dụng |
-| `rawSummary` | string | Báo cáo gốc từ AI (chưa sanitize) |
-| `sanitizedSummary` | string | Báo cáo đã được sanitize (loại bỏ thông tin nhạy cảm) |
+| `rawSummary` | string | Báo cáo gốc từ AI (JSON chuỗi) |
+| `sanitizedSummary` | string | Báo cáo đã sanitize (JSON chuỗi) |
+| `insight` | string | Câu tóm tắt ngắn gọn (đã parse sẵn từ `sanitizedSummary`) |
+| `rootCause` | string | Nguyên nhân chính |
+| `priorityAction` | string | Hành động ưu tiên |
 | `usagePromptTokens` | integer | Số token trong prompt |
 | `usageCompletionTokens` | integer | Số token trong response |
 | `usageTotalTokens` | integer | Tổng số token sử dụng |
 | `createdAt` | string (ISO 8601) | Thời điểm tạo report |
 | `updatedAt` | string (ISO 8601) | Thời điểm cập nhật report |
 
-**Format của `sanitizedSummary`:**
+**Format mới của `sanitizedSummary`:**
 ```json
 {
-  "highlights": ["Điểm nổi bật 1", "Điểm nổi bật 2"],
-  "risks": ["Rủi ro 1", "Rủi ro 2"],
-  "kpis": {
-    "totalTransactions": 100,
-    "totalSpending": 5000000,
-    "totalIncome": 10000000
-  },
-  "advice": ["Lời khuyên 1", "Lời khuyên 2"]
+  "insight": "Chuỗi thông điệp 120 ký tự",
+  "rootCause": "Giải thích vì sao insight xảy ra",
+  "priorityAction": "Việc quan trọng nhất nên làm"
 }
 ```
+> API đã parse sẵn các trường này ra ngoài nên frontend chỉ cần dùng `insight/rootCause/priorityAction` cho ô “Báo cáo hôm nay”.
 
 **Example Request:**
 ```bash
@@ -532,8 +559,11 @@ curl -X GET "http://localhost:8080/api/reports/daily?date=2024-01-15"
 {
   "reportDate": "2024-01-15T00:00:00+07:00",
   "model": "gemini-2.5-flash",
-  "rawSummary": "{\"highlights\":[\"Tổng giao dịch: 50\",\"Tiết kiệm: 2,000,000 VNĐ\"],\"risks\":[\"Chi tiêu vượt ngân sách 10%\"],\"kpis\":{\"totalTransactions\":50,\"totalSpending\":5000000,\"totalIncome\":10000000},\"advice\":[\"Nên giảm chi tiêu không cần thiết\"]}",
-  "sanitizedSummary": "{\"highlights\":[\"Tổng giao dịch: 50\",\"Tiết kiệm: 2,000,000 VNĐ\"],\"risks\":[\"Chi tiêu vượt ngân sách 10%\"],\"kpis\":{\"totalTransactions\":50,\"totalSpending\":5000000,\"totalIncome\":10000000},\"advice\":[\"Nên giảm chi tiêu không cần thiết\"]}",
+  "rawSummary": "{\"insight\":\"Dòng tiền dương 5.2M VND\",\"rootCause\":\"Thu nhập 8M cao hơn chi 2.8M\",\"priorityAction\":\"Dành thêm 500k vào mục tiêu laptop\"}",
+  "sanitizedSummary": "{\"insight\":\"Dòng tiền dương 5.2M VND\",\"rootCause\":\"Thu nhập 8M cao hơn chi 2.8M\",\"priorityAction\":\"Dành thêm 500k vào mục tiêu laptop\"}",
+  "insight": "Dòng tiền dương 5.2M VND",
+  "rootCause": "Thu nhập 8M cao hơn chi 2.8M",
+  "priorityAction": "Dành thêm 500k vào mục tiêu laptop",
   "usagePromptTokens": 500,
   "usageCompletionTokens": 300,
   "usageTotalTokens": 800,
@@ -555,65 +585,19 @@ curl -X GET "http://localhost:8080/api/reports/daily?date=2024-01-15"
 
 ---
 
-#### 2.2. Generate Daily Report
+#### 2.2. Luồng sử dụng trên trang Home (Báo cáo hôm nay)
 
-Trigger thủ công để tạo report cho hôm nay. Endpoint này sẽ chạy scheduler để fetch dữ liệu và tạo report.
-
-**Endpoint:** `POST /api/reports/daily/generate`
-
-**Request Headers:**
-```
-Accept: application/json
-```
-
-**Response:** `200 OK`
-
-**Response Body:** (Giống như Get Daily Report)
-
-**Cơ chế hoạt động:**
-1. Trigger scheduler để fetch dữ liệu từ các downstream services
-2. Tạo prompt và gọi Gemini API
-3. Sanitize response
-4. Lưu vào database
-5. Trả về report vừa tạo
-
-**Lưu ý:** 
-- Endpoint này chạy bất đồng bộ (async)
-- Có delay 3 giây để đợi scheduler hoàn thành
-- Nếu không tạo được report, sẽ trả về 500 error
-
-**Example Request:**
-```bash
-curl -X POST "http://localhost:8080/api/reports/daily/generate"
-```
-
-**Example Response:**
-```json
-{
-  "reportDate": "2024-01-15T00:00:00+07:00",
-  "model": "gemini-2.5-flash",
-  "rawSummary": "...",
-  "sanitizedSummary": "...",
-  "usagePromptTokens": 500,
-  "usageCompletionTokens": 300,
-  "usageTotalTokens": 800,
-  "createdAt": "2024-01-15T10:30:00+07:00",
-  "updatedAt": "2024-01-15T10:30:00+07:00"
-}
-```
-
-**Error Responses:**
-
-**500 Internal Server Error** - Không tạo được report
-```json
-{
-  "code": "500",
-  "message": "Failed to generate report. Check logs for details.",
-  "timestamp": "2024-01-15T10:30:00+07:00"
-}
-```
+- Frontend (module Trang chủ → ô “Báo cáo hôm nay”) gọi `GET /ai/reports/daily` qua Gateway mỗi khi người dùng mở app hoặc bấm “Tạo báo cáo mới”.
+- Các field sử dụng:
+  - `insight`: hiển thị dòng tiêu đề (ví dụ “Dòng tiền dương 5.2M VND”).
+  - `rootCause`: câu giải thích ngắn (ví dụ “Thu nhập 8M cao hơn chi 2.8M”).
+  - `priorityAction`: hành động gợi ý duy nhất (ví dụ “Dành thêm 500k vào mục tiêu laptop”).
+- Nếu bất kỳ field nào trống/null, frontend nên hiển thị fallback “Chưa đủ dữ liệu để tạo báo cáo hôm nay” và gợi ý đồng bộ giao dịch.
+- Khi người dùng bấm “Xem chi tiết”, có thể hiển thị lại `sanitizedSummary` (định dạng JSON chuỗi) hoặc gọi lại API để lấy dữ liệu mới nhất.
+- Lưu ý: phải gửi kèm header `Authorization: Bearer <JWT>` giống các API khác.
 
 ---
+
 
 ## Error Handling
 
@@ -700,12 +684,14 @@ API hỗ trợ tính năng lưu lịch sử conversation giống ChatGPT:
    - AI sẽ có context để trả lời phù hợp hơn
 
 3. **Xem danh sách conversations:**
-   - Gọi `GET /api/chat/conversations?userId=user123`
-   - Nhận danh sách tất cả conversations của user
+   - Gọi `GET /api/chat/conversations`
+   - User ID được lấy từ JWT, trả về danh sách conversation của chính người gửi request
 
 4. **Xem lịch sử conversation:**
    - Gọi `GET /api/chat/conversations/{conversationId}`
    - Nhận toàn bộ messages trong conversation
+5. **Widget presets:**
+   - Khi gửi `context = SPENDING_WIDGET/SAVING_WIDGET/GOAL_WIDGET`, conversation sẽ **không** được lưu vào lịch sử để tránh “rác” danh sách.
 
 ### Lưu ý:
 
@@ -749,10 +735,10 @@ API tự động fetch dữ liệu từ các downstream services (nếu có):
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Transaction | `http://localhost:8081/api/summary/daily` | Dữ liệu giao dịch |
-| User Profile | `http://localhost:8082/api/summary/daily` | Hồ sơ người dùng |
-| Goals | `http://localhost:8083/api/summary/daily` | Mục tiêu tài chính |
-| Learning | `http://localhost:8084/api/summary/daily` | Hoạt động học tập |
+| Transaction | `http://finance-service/api/summary/daily` | Dữ liệu giao dịch |
+| User Profile | `http://auth-service/api/summary/daily` | Hồ sơ người dùng |
+| Goals | `http://gamification-service/api/summary/daily` | Mục tiêu tài chính |
+| Learning | `http://learning-service/api/summary/daily` | Hoạt động học tập |
 
 **Lưu ý:**
 - Nếu service không available, API sẽ bỏ qua và tiếp tục với dữ liệu có sẵn
@@ -770,21 +756,6 @@ Hiện tại API không có rate limiting. Tuy nhiên, cần lưu ý:
 
 ---
 
-## Scheduler
-
-API có scheduler tự động tạo daily report:
-
-**Cron Expression:** `0 15 2 * * *` (02:15 hàng ngày)
-
-**Có thể cấu hình trong:** `application.yaml`
-```yaml
-edufinai:
-  scheduler:
-    daily:
-      cron: "0 15 2 * * *"
-```
-
----
 
 ## Testing
 
@@ -792,9 +763,9 @@ edufinai:
 
 ```bash
 curl -X POST http://localhost:8080/api/chat/ask \
+  -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" \
   -d '{
-    "userId": "test-user",
     "question": "Tôi nên đầu tư như thế nào?"
   }'
 ```
@@ -803,9 +774,9 @@ curl -X POST http://localhost:8080/api/chat/ask \
 
 ```bash
 curl -X POST http://localhost:8080/api/chat/ask \
+  -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" \
   -d '{
-    "userId": "test-user",
     "conversationId": "550e8400-e29b-41d4-a716-446655440000",
     "question": "Có rủi ro gì không?"
   }'
@@ -814,38 +785,36 @@ curl -X POST http://localhost:8080/api/chat/ask \
 ### Test Get Conversations
 
 ```bash
-curl -X GET "http://localhost:8080/api/chat/conversations?userId=test-user"
+curl -X GET "http://localhost:8080/api/chat/conversations" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
 ### Test Get Conversation History
 
 ```bash
-curl -X GET "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000"
+curl -X GET "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
 ### Test Delete Conversation
 
 ```bash
-curl -X DELETE "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000"
+curl -X DELETE "http://localhost:8080/api/chat/conversations/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
 ### Test Get Daily Report
 
 ```bash
 # Lấy report hôm nay
-curl -X GET "http://localhost:8080/api/reports/daily"
+curl -X GET "http://localhost:8080/api/reports/daily" \
+  -H "Authorization: Bearer <JWT>"
 
 # Lấy report theo ngày
-curl -X GET "http://localhost:8080/api/reports/daily?date=2024-01-15"
+curl -X GET "http://localhost:8080/api/reports/daily?date=2024-01-15" \
+  -H "Authorization: Bearer <JWT>"
 ```
 
-### Test Generate Report
-
-```bash
-curl -X POST "http://localhost:8080/api/reports/daily/generate"
-```
-
----
 
 ## Configuration
 
@@ -931,6 +900,13 @@ Lưu trữ daily reports:
 ---
 
 ## Changelog
+
+### Version 0.0.4-SNAPSHOT
+- ✅ Bắt buộc JWT cho toàn bộ API, cập nhật tài liệu header & ví dụ
+- ✅ Thêm `context` cho `/api/chat/ask`, mô tả chế độ widget và bỏ lưu lịch sử khi dùng preset
+- ✅ Report API parse sẵn `insight/rootCause/priorityAction`, cập nhật response schema
+- ✅ Gỡ endpoint/scheduler cũ `POST /api/reports/daily/generate` khỏi tài liệu
+- ✅ Cập nhật Postman/tài liệu hướng dẫn frontend
 
 ### Version 0.0.3-SNAPSHOT
 - ✅ Thêm tính năng hiển thị thời gian tương đối (relativeTime) cho conversations

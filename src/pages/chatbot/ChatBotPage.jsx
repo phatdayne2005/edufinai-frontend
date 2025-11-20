@@ -325,34 +325,8 @@ const ChatBotPage = () => {
       
       // Kiểm tra nếu không có dữ liệu hợp lệ, thử fallback
       if (!answer && tips.length === 0 && disclaimers.length === 0) {
-        console.warn('[ChatBot] No valid content found, trying fallback...');
-        console.error('[ChatBot] Response details:', {
-          response,
-          answerJson: response.rawAnswerJson,
-          answer: response.answer,
-          tips: response.tips,
-          disclaimers: response.disclaimers,
-        });
-        
-        // Fallback: dùng rawAnswerJson nếu có và là text thuần
-        if (response.rawAnswerJson && typeof response.rawAnswerJson === 'string') {
-          const rawText = response.rawAnswerJson.trim();
-          if (rawText && rawText.length > 0) {
-            // Nếu không phải JSON format, dùng như text thuần
-            if (!rawText.startsWith('{') && !rawText.startsWith('[') && !rawText.startsWith('```')) {
-              console.log('[ChatBot] Using rawAnswerJson as plain text fallback');
-              answer = rawText;
-            } else {
-              // Nếu là JSON nhưng parse thất bại, log và throw error
-              console.error('[ChatBot] answerJson appears to be JSON but parsing failed');
-              throw new Error('Không thể xử lý phản hồi từ AI. Vui lòng thử lại hoặc liên hệ hỗ trợ.');
-            }
-          } else {
-            throw new Error('Không nhận được nội dung phản hồi từ AI. Vui lòng thử lại.');
-          }
-        } else {
-          throw new Error('Không nhận được nội dung phản hồi từ AI. Vui lòng thử lại.');
-        }
+        console.error('[ChatBot] No valid content found in response:', response);
+        throw new Error('Không nhận được nội dung phản hồi từ AI. Vui lòng thử lại.');
       }
 
       // Gộp tất cả nội dung thành một message text tự nhiên như ChatGPT

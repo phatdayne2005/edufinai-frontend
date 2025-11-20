@@ -48,7 +48,15 @@ Content-Type: application/json
 {
   "userId": "user123",
   "question": "Tôi nên tiết kiệm bao nhiêu mỗi tháng?",
-  "answerJson": "{\"answer\":\"Dựa trên thu nhập...\",\"tips\":[\"Mẹo 1\"],\"disclaimers\":[\"Lưu ý 1\"]}",
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "answer": "Chào bạn! Dựa trên thu nhập hiện tại...",
+  "tips": [
+    "Giữ mức tiết kiệm ổn định 20% thu nhập",
+    "Tự động chuyển tiền sang tài khoản tiết kiệm sau khi nhận lương"
+  ],
+  "disclaimers": [
+    "Thông tin chỉ mang tính tham khảo, không phải tư vấn đầu tư"
+  ],
   "model": "gemini-2.5-flash",
   "promptTokens": 150,
   "completionTokens": 200,
@@ -58,28 +66,18 @@ Content-Type: application/json
 ```
 
 **Lưu ý quan trọng:**
-- `answerJson` là một **JSON string**, không phải object
-- Cần parse `answerJson` để lấy `answer`, `tips`, `disclaimers`
+- Backend hiện trả về `answer`, `tips`, `disclaimers` ở cấp cao nhất
+- Không còn cần parse JSON string thủ công (nhưng frontend vẫn hỗ trợ legacy `answerJson` nếu backend cũ còn trả về)
 
-### 4. Service parse response
+### 4. Service chuẩn hóa response
 
 **Trong edufinaiApi.js:**
 ```javascript
-// Parse answerJson từ string thành object
-const parsedAnswer = JSON.parse(response.answerJson);
-// parsedAnswer = {
-//   "answer": "Dựa trên thu nhập...",
-//   "tips": ["Mẹo 1"],
-//   "disclaimers": ["Lưu ý 1"]
-// }
+const sections = extractAnswerSections(response); // Lấy answer/tips/disclaimers, fallback legacy nếu cần
 
-// Trả về object đã được xử lý
-return {
-  ...response,                    // Giữ nguyên tất cả field từ API
-  answer: parsedAnswer.answer,    // Extract answer
-  tips: parsedAnswer.tips,        // Extract tips array
-  disclaimers: parsedAnswer.disclaimers,  // Extract disclaimers array
-  rawAnswerJson: response.answerJson  // Giữ raw để debug
+const result = {
+  ...response,
+  ...sections,
 };
 ```
 
@@ -122,21 +120,15 @@ setMessages((prev) => [...prev, botMessage]);
 {
   userId: string;
   question: string;
-  answerJson: string;        // JSON string cần parse
+  conversationId: string;
+  answer: string;
+  tips: string[];
+  disclaimers: string[];
   model: string;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  createdAt: string;         // ISO 8601
-}
-```
-
-### Parsed answerJson
-```typescript
-{
-  answer: string;
-  tips: string[];
-  disclaimers: string[];
+  createdAt: string;
 }
 ```
 
@@ -146,19 +138,19 @@ setMessages((prev) => [...prev, botMessage]);
   // Tất cả field từ API response
   userId: string;
   question: string;
+  conversationId: string;
   model: string;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
   createdAt: string;
   
-  // Các field đã được parse từ answerJson
+  // Các field đã được chuẩn hóa
   answer: string;
   tips: string[];
   disclaimers: string[];
-  
-  // Raw data để debug
-  rawAnswerJson: string;
+
+  // Metadata khác nếu backend bổ sung (formattedAnswer, flags, v.v.)
 }
 ```
 
@@ -192,7 +184,6 @@ setMessages((prev) => [...prev, botMessage]);
 2. **Khi nhận response:**
    ```
    [EduFinAI API] Raw response received: {...}
-   [EduFinAI API] Parsed answerJson: {...}
    [EduFinAI API] Final processed response: {...}
    ```
 
@@ -205,11 +196,9 @@ setMessages((prev) => [...prev, botMessage]);
 
 ## Xử Lý Lỗi
 
-### Lỗi Parse JSON
-Nếu `answerJson` không phải là JSON hợp lệ:
-- Code sẽ catch error
-- Trả về `rawAnswerJson` như là `answer`
-- `tips` và `disclaimers` sẽ là mảng rỗng
+### Legacy `answerJson`
+- Nếu backend cũ vẫn trả về `answerJson`, frontend sẽ tự động parse
+- Nếu parse thất bại, chuỗi raw (nếu là plain text) sẽ được dùng làm answer
 
 ### Lỗi Network
 - Hiển thị error message trong chat
@@ -238,7 +227,9 @@ POST /api/chat/ask
 {
   "userId": "user@example.com",
   "question": "Tôi nên tiết kiệm bao nhiêu?",
-  "answerJson": "{\"answer\":\"Nên tiết kiệm ít nhất 20% thu nhập...\",\"tips\":[\"Tự động chuyển tiền\",\"Theo dõi chi tiêu\"],\"disclaimers\":[\"Thông tin tham khảo\"]}",
+  "answer": "Nên tiết kiệm ít nhất 20% thu nhập...",
+  "tips": ["Tự động chuyển tiền", "Theo dõi chi tiêu"],
+  "disclaimers": ["Thông tin tham khảo"],
   "model": "gemini-2.5-flash",
   "totalTokens": 350
 }
@@ -246,11 +237,11 @@ POST /api/chat/ask
 
 ### 4. Service parse:
 ```javascript
-parsedAnswer = {
+const sections = {
   answer: "Nên tiết kiệm ít nhất 20% thu nhập...",
   tips: ["Tự động chuyển tiền", "Theo dõi chi tiêu"],
   disclaimers: ["Thông tin tham khảo"]
-}
+};
 ```
 
 ### 5. ChatBot hiển thị:
