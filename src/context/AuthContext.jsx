@@ -9,6 +9,10 @@ import React, {
 import mockData from '../data/mockData';
 import { AUTH_ENABLED } from '../constants/featureFlags';
 import * as authApi from '../services/authApi';
+import {
+  promptAndRegisterNotificationToken,
+  unregisterNotificationToken,
+} from '../firebase/firebaseMessaging';
 
 const AuthContext = createContext(null);
 const BYPASS_STORAGE_KEY = 'financeEduAuthBypass';
@@ -95,13 +99,13 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async ({ username, password, token }) => {
     try {
       let finalToken = token;
-      
+
       // If no token provided, login to get token
       if (!finalToken && username && password) {
         const loginResult = await authApi.login(username, password);
         finalToken = loginResult.token;
       }
-      
+
       // Save token to localStorage
       if (finalToken) {
         authApi.setToken(finalToken);
@@ -111,7 +115,7 @@ export const AuthProvider = ({ children }) => {
 
       // Fetch user info from API
       const userInfo = await authApi.getCurrentUser();
-      
+
       setState({
         isAuthenticated: true,
         user: {
@@ -131,14 +135,20 @@ export const AuthProvider = ({ children }) => {
         ready: true,
         bypassed: false,
       });
-      
+
       localStorage.removeItem(BYPASS_STORAGE_KEY);
+
+      try {
+        await promptAndRegisterNotificationToken(finalToken);
+      } catch (notificationError) {
+        console.warn('Không thể đăng ký thông báo:', notificationError);
+      }
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Đăng nhập thất bại' 
+      return {
+        success: false,
+        error: error.message || 'Đăng nhập thất bại'
       };
     }
   }, []);
@@ -162,9 +172,11 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', error);
       // Continue with logout even if API call fails
     } finally {
+      const jwtToken = authApi.getStoredToken();
+      await unregisterNotificationToken(jwtToken).catch(() => { });
       localStorage.removeItem(BYPASS_STORAGE_KEY);
       authApi.removeToken();
-      
+
       if (!AUTH_ENABLED) {
         return;
       }
