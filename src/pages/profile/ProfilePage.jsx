@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, ChevronRight } from 'lucide-react';
+import { Brain, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
 import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
+import { askQuestion } from '../../services/aiService';
 
 const menuItems = [
   { icon: '🔔', label: 'Thông báo' },
@@ -13,9 +14,43 @@ const menuItems = [
   { icon: '❓', label: 'Trợ giúp' },
 ];
 
+const widgetConfigs = [
+  {
+    key: 'spending',
+    title: '📊 Phân tích chi tiêu',
+    context: 'SPENDING_WIDGET',
+    conversationId: 'advisor-spending',
+    description: 'Phân tích khoản chi nổi bật 7 ngày gần nhất.',
+  },
+  {
+    key: 'saving',
+    title: '💰 Gợi ý tiết kiệm',
+    context: 'SAVING_WIDGET',
+    conversationId: 'advisor-saving',
+    description: 'Tiến độ tiết kiệm và đề xuất đóng góp tiếp theo.',
+  },
+  {
+    key: 'goal',
+    title: '🎯 Mục tiêu tiếp theo',
+    context: 'GOAL_WIDGET',
+    conversationId: 'advisor-goal',
+    description: 'Mục tiêu tài chính cần ưu tiên cùng % hoàn thành.',
+  },
+];
+
 const ProfilePage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [widgets, setWidgets] = useState(() =>
+    widgetConfigs.map((config) => ({
+      ...config,
+      loading: true,
+      error: null,
+      answer: '',
+      tips: [],
+      disclaimers: [],
+    }))
+  );
 
   const handleLogout = async () => {
     try {
@@ -26,6 +61,57 @@ const ProfilePage = () => {
       navigate('/auth/login', { replace: true });
     }
   };
+
+  const fetchWidget = async (key) => {
+    setWidgets((prev) =>
+      prev.map((widget) =>
+        widget.key === key
+          ? { ...widget, loading: true, error: null }
+          : widget
+      )
+    );
+
+    const config = widgetConfigs.find((item) => item.key === key);
+    if (!config) return;
+
+    try {
+      const response = await askQuestion({
+        conversationId: config.conversationId,
+        context: config.context,
+      });
+
+      setWidgets((prev) =>
+        prev.map((widget) =>
+          widget.key === key
+            ? {
+                ...widget,
+                loading: false,
+                answer: response.answer || 'Chưa có dữ liệu để phân tích.',
+                tips: response.tips || [],
+                disclaimers: response.disclaimers || [],
+              }
+            : widget
+        )
+      );
+    } catch (error) {
+      setWidgets((prev) =>
+        prev.map((widget) =>
+          widget.key === key
+            ? {
+                ...widget,
+                loading: false,
+                error: error.message || 'Không thể tải dữ liệu AI',
+              }
+            : widget
+        )
+      );
+    }
+  };
+
+  useEffect(() => {
+    widgetConfigs.forEach((config) => fetchWidget(config.key));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fallback to default values if user is not loaded yet
   const displayUser = user || {
@@ -86,22 +172,61 @@ const ProfilePage = () => {
           <Brain size={24} color="#4CAF50" />
           <h3 style={styles.sectionTitle}>Tư vấn AI</h3>
         </div>
-        <div style={styles.aiCard}>
-          <p style={styles.aiCardTitle}>📊 Phân tích chi tiêu</p>
-          <p style={styles.aiCardText}>Chi tiêu tháng này giảm 40% so với tháng trước. Bạn đang làm rất tốt!</p>
-        </div>
-        <div style={styles.aiCard}>
-          <p style={styles.aiCardTitle}>💰 Gợi ý tiết kiệm</p>
-          <p style={styles.aiCardText}>
-            Hãy cân nhắc chuyển 10% thu nhập vào quỹ đầu tư dài hạn để tối ưu lợi nhuận.
-          </p>
-        </div>
-        <div style={styles.aiCard}>
-          <p style={styles.aiCardTitle}>🎯 Mục tiêu tiếp theo</p>
-          <p style={styles.aiCardText}>
-            Với tốc độ tiết kiệm hiện tại, bạn có thể đạt mục tiêu "Mua laptop mới" trong 2 tháng nữa.
-          </p>
-        </div>
+        {widgets.map((widget) => (
+          <div key={widget.key} style={styles.aiCard}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={styles.aiCardTitle}>{widget.title}</p>
+              <button
+                type="button"
+                onClick={() => fetchWidget(widget.key)}
+                disabled={widget.loading}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: widget.loading ? 'not-allowed' : 'pointer',
+                  color: '#4CAF50',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Làm mới"
+              >
+                {widget.loading ? (
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <RefreshCw size={16} />
+                )}
+              </button>
+            </div>
+            <p style={{ ...styles.aiCardText, color: '#757575', fontSize: '12px', marginTop: 0 }}>
+              {widget.description}
+            </p>
+            {widget.error ? (
+              <div style={{ color: '#F44336', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={16} />
+                <span>{widget.error}</span>
+              </div>
+            ) : widget.loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#666' }}>
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Đang lấy dữ liệu từ AI...</span>
+              </div>
+            ) : (
+              <>
+                <p style={styles.aiCardText}>{widget.answer}</p>
+                {widget.tips && widget.tips.length > 0 && (
+                  <ul style={{ margin: '8px 0 0 16px', color: '#4CAF50', fontSize: '13px' }}>
+                    {widget.tips.map((tip, index) => (
+                      <li key={index}>{tip}</li>
+                    ))}
+                  </ul>
+                )}
+                {widget.disclaimers && widget.disclaimers.length > 0 && (
+                  <p style={{ marginTop: 10, fontSize: '12px', color: '#999' }}>⚠️ {widget.disclaimers[0]}</p>
+                )}
+              </>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Theme Customizer */}

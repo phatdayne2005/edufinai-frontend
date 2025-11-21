@@ -6,6 +6,7 @@ import FinancePage from '../finance/FinancePage';
 import LearningPage from '../learning/LearningPage';
 import ChallengesPage from '../challenges/ChallengesPage';
 import ProfilePage from '../profile/ProfilePage';
+import ChatBotPage from '../chat/ChatBotPage';
 import { styles } from '../../styles/appStyles';
 import { tabs, defaultTab } from '../../constants/navigation';
 import { listenForegroundNotifications } from '../../firebase/firebaseMessaging';
@@ -14,6 +15,7 @@ const tabComponents = {
   home: HomePage,
   finance: FinancePage,
   learning: LearningPage,
+  'ai-chat': ChatBotPage,
   challenges: ChallengesPage,
   profile: ProfilePage,
 };
