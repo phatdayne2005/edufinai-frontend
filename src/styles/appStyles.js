@@ -73,6 +73,7 @@ const frostedCard = {
 const interactiveCard = {
   ...cardBase,
   cursor: 'pointer',
+  transition: `transform ${transitions.soft}, box-shadow ${transitions.soft}, border-color ${transitions.soft}`,
 };
 
 const textMuted = {
@@ -268,6 +269,7 @@ export const styles = {
     gap: spacing.sm,
     marginBottom: spacing.xl,
     width: '100%',
+    gridAutoRows: '1fr',
   },
   quickActionBtn: {
     ...interactiveCard,
@@ -280,6 +282,7 @@ export const styles = {
     alignItems: 'center',
     gap: spacing.md,
     minHeight: '88px',
+    width: '100%',
   },
   quickActionIconWrap: {
     ...pill,
@@ -727,6 +730,10 @@ export const styles = {
     padding: spacing.md,
     marginBottom: spacing.xs,
     width: '100%',
+    backgroundColor: palette.primary,
+    border: 'none',
+    color: '#fff',
+    boxShadow: 'var(--shadow-sm)',
   },
   menuLeft: {
     display: 'flex',
@@ -735,19 +742,26 @@ export const styles = {
   },
   menuIcon: {
     fontSize: '20px',
+    color: '#fff',
   },
   menuLabel: {
     fontSize: 'var(--font-size-sm)',
     fontWeight: 500,
-    color: palette.textPrimary,
+    color: '#fff',
   },
   logoutButton: {
-    ...buttonBase,
+    ...interactiveCard,
     width: '100%',
     backgroundColor: palette.danger,
+    border: 'none',
     color: '#fff',
     marginTop: spacing.lg,
-    boxShadow: 'var(--shadow-xs)',
+    minHeight: '88px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontSize: 'var(--font-size-md)',
+    boxShadow: 'var(--shadow-md)',
   },
   infoCard: {
     ...cardBase,
@@ -1033,9 +1047,9 @@ export const styles = {
     margin: 0,
   },
   themeOptionRow: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: spacing.sm,
-    flexWrap: 'wrap',
     marginBottom: spacing.lg,
   },
   themeOptionButton: {
@@ -1048,12 +1062,17 @@ export const styles = {
     gap: spacing.xxs,
     borderRadius: radius.md,
     padding: `${spacing.sm} ${spacing.lg}`,
+    backgroundColor: palette.card,
+    color: palette.textPrimary,
+    borderColor: palette.border,
+    width: '100%',
+    minHeight: '120px',
   },
   themeOptionActive: {
-    borderColor: palette.primary,
-    boxShadow: `0 0 0 2px ${palette.primaryGlow}`,
-    color: palette.textPrimary,
-    backgroundColor: palette.primarySoft,
+    borderColor: 'transparent',
+    boxShadow: `0 12px 30px ${palette.primaryGlow}`,
+    color: '#fff',
+    backgroundImage: 'var(--gradient-brand)',
   },
   themeAccentGrid: {
     display: 'grid',
@@ -1063,8 +1082,17 @@ export const styles = {
   accentButton: {
     ...outlineButton,
     flexDirection: 'column',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
+    backgroundColor: palette.card,
+    color: palette.textPrimary,
+    borderColor: palette.border,
+    padding: spacing.sm,
+    width: '100%',
+    minHeight: '100px',
+    borderRadius: radius.sm,
+    transition: `background-color ${transitions.soft}, border-color ${transitions.soft}, box-shadow ${transitions.soft}`,
   },
   accentButtonActive: {
     borderColor: palette.primary,
@@ -1072,15 +1100,29 @@ export const styles = {
   },
   accentSwatch: {
     width: '100%',
-    height: '40px',
+    aspectRatio: '1 / 1',
     borderRadius: radius.sm,
-    marginBottom: spacing.xs,
+    boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.2)',
+    position: 'relative',
   },
-  accentLabel: {
-    fontSize: 'var(--font-size-xs)',
-    color: palette.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
+  accentSwatchActive: {
+    boxShadow: `0 0 0 2px ${palette.primaryGlow}`,
+  },
+  accentCheck: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '20px',
+    height: '20px',
+    borderRadius: radius.full,
+    backgroundColor: '#fff',
+    color: palette.primary,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 700,
   },
   toggleRow: {
     display: 'flex',

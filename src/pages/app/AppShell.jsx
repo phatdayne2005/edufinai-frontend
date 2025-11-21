@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import BottomNav from '../../components/layout/BottomNav';
 import HomePage from '../home/HomePage';
 import FinancePage from '../finance/FinancePage';
@@ -22,6 +22,7 @@ const tabComponents = {
 
 const AppShell = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [transitionDirection, setTransitionDirection] = useState('forward');
   const [incomingNotification, setIncomingNotification] = useState(null);
@@ -42,8 +43,9 @@ const AppShell = () => {
     const requestedTab = location.state?.activeTab;
     if (requestedTab && requestedTab !== activeTab) {
       handleTabChange(requestedTab);
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state?.activeTab, handleTabChange, activeTab]);
+  }, [location.state?.activeTab, handleTabChange, activeTab, navigate, location.pathname]);
 
   // Listen to foreground FCM notifications for debugging
   useEffect(() => {

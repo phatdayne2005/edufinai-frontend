@@ -37,6 +37,24 @@ const PersonalInfoPage = () => {
     avatar: '👤',
   };
 
+  const accentColor = 'var(--color-primary)';
+  const accentSoftColor = 'var(--color-primary-soft)';
+  const textPrimaryColor = 'var(--text-primary)';
+  const textMutedColor = 'var(--text-secondary)';
+  const borderSubtleColor = 'var(--border-subtle)';
+
+  const getTabButtonStyle = (isActive) => ({
+    padding: '12px 20px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    borderBottom: `2px solid ${isActive ? accentColor : 'transparent'}`,
+    color: isActive ? accentColor : textMutedColor,
+    fontWeight: isActive ? 600 : 500,
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'color 0.2s ease, border-color 0.2s ease',
+  });
+
   const handleBack = () => {
     // Navigate back to home and set active tab to profile
     navigate('/', { replace: true, state: { activeTab: 'profile' } });
@@ -325,12 +343,12 @@ const PersonalInfoPage = () => {
                     key={index}
                     style={{
                       padding: '6px 14px',
-                      backgroundColor: '#E8F5E9',
-                      color: '#4CAF50',
+                      backgroundColor: accentSoftColor,
+                      color: accentColor,
                       borderRadius: '16px',
                       fontSize: '13px',
                       fontWeight: '500',
-                      border: '1px solid #4CAF50',
+                      border: `1px solid ${accentColor}`,
                     }}
                   >
                     {role.name}
@@ -351,7 +369,7 @@ const PersonalInfoPage = () => {
     return (
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>Đổi mật khẩu</h3>
-        <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
+        <p style={{ fontSize: '14px', color: textMutedColor, marginBottom: '20px' }}>
           Vui lòng nhập mật khẩu cũ và mật khẩu mới để thay đổi mật khẩu
         </p>
 
@@ -441,7 +459,7 @@ const PersonalInfoPage = () => {
       return (
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Xác thực mật khẩu</h3>
-          <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
+          <p style={{ fontSize: '14px', color: textMutedColor, marginBottom: '20px' }}>
             Vui lòng nhập mật khẩu để xác thực trước khi cập nhật thông tin
           </p>
           <form onSubmit={handlePasswordVerify} style={styles.authForm}>
@@ -574,12 +592,12 @@ const PersonalInfoPage = () => {
                     key={index}
                     style={{
                       padding: '6px 14px',
-                      backgroundColor: '#E8F5E9',
-                      color: '#4CAF50',
+                      backgroundColor: accentSoftColor,
+                      color: accentColor,
                       borderRadius: '16px',
                       fontSize: '13px',
                       fontWeight: '500',
-                      border: '1px solid #4CAF50',
+                      border: `1px solid ${accentColor}`,
                     }}
                   >
                     {role.name}
@@ -609,7 +627,7 @@ const PersonalInfoPage = () => {
           onClick={() => setShowConfirmDialog(true)}
           style={{
             ...styles.logoutButton,
-            backgroundColor: '#4CAF50',
+            backgroundColor: accentColor,
             marginTop: '20px',
           }}
           disabled={loading}
@@ -630,19 +648,19 @@ const PersonalInfoPage = () => {
             type="button"
             onClick={handleBack}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '8px 16px',
-              backgroundColor: '#f5f5f5',
-              border: '1px solid #E0E0E0',
-              borderRadius: '8px',
+              padding: 0,
+              background: 'transparent',
+              border: 'none',
               cursor: 'pointer',
               fontSize: '14px',
-              color: '#212121',
+              fontWeight: 600,
+              color: accentColor,
             }}
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={18} color={accentColor} />
             Quay lại
           </button>
         }
@@ -651,9 +669,10 @@ const PersonalInfoPage = () => {
       {/* Tab Navigation */}
       <div style={{
         display: 'flex',
+        flexWrap: 'wrap',
         gap: '8px',
         marginBottom: '20px',
-        borderBottom: '1px solid #E0E0E0',
+        borderBottom: `1px solid ${borderSubtleColor}`,
       }}>
         <button
           type="button"
@@ -662,16 +681,7 @@ const PersonalInfoPage = () => {
             setPasswordVerified(false);
             setUpdateError('');
           }}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            backgroundColor: 'transparent',
-            borderBottom: activeTab === 'view' ? '2px solid #4CAF50' : '2px solid transparent',
-            color: activeTab === 'view' ? '#4CAF50' : '#666',
-            fontWeight: activeTab === 'view' ? '600' : '400',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
+          style={getTabButtonStyle(activeTab === 'view')}
         >
           Xem thông tin
         </button>
@@ -692,16 +702,7 @@ const PersonalInfoPage = () => {
               dob: user?.dob ? user.dob.split('T')[0] : '',
             });
           }}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            backgroundColor: 'transparent',
-            borderBottom: activeTab === 'edit' ? '2px solid #4CAF50' : '2px solid transparent',
-            color: activeTab === 'edit' ? '#4CAF50' : '#666',
-            fontWeight: activeTab === 'edit' ? '600' : '400',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
+          style={getTabButtonStyle(activeTab === 'edit')}
         >
           Cập nhật thông tin
         </button>
@@ -716,16 +717,7 @@ const PersonalInfoPage = () => {
               confirmPassword: '',
             });
           }}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            backgroundColor: 'transparent',
-            borderBottom: activeTab === 'changePassword' ? '2px solid #2196F3' : '2px solid transparent',
-            color: activeTab === 'changePassword' ? '#2196F3' : '#666',
-            fontWeight: activeTab === 'changePassword' ? '600' : '400',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
+          style={getTabButtonStyle(activeTab === 'changePassword')}
         >
           Đổi mật khẩu
         </button>
@@ -735,18 +727,6 @@ const PersonalInfoPage = () => {
       {activeTab === 'view' && renderViewTab()}
       {activeTab === 'edit' && renderEditTab()}
       {activeTab === 'changePassword' && renderChangePasswordTab()}
-
-      <button
-        type="button"
-        onClick={handleBack}
-        style={{
-          ...styles.logoutButton,
-          backgroundColor: '#4CAF50',
-          marginTop: '20px',
-        }}
-      >
-        Quay lại
-      </button>
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
@@ -780,7 +760,7 @@ const PersonalInfoPage = () => {
             </h3>
             <p style={{
               fontSize: '14px',
-              color: '#666',
+              color: textMutedColor,
               margin: '0 0 20px 0',
             }}>
               Bạn có chắc chắn muốn cập nhật thông tin cá nhân không?
@@ -795,12 +775,13 @@ const PersonalInfoPage = () => {
                 onClick={() => setShowConfirmDialog(false)}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: '#f5f5f5',
-                  border: '1px solid #E0E0E0',
+                  backgroundColor: 'transparent',
+                  border: `1px solid ${borderSubtleColor}`,
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  color: '#212121',
+                  color: textPrimaryColor,
+                  fontWeight: 600,
                 }}
               >
                 Quay lại
@@ -811,7 +792,7 @@ const PersonalInfoPage = () => {
                 disabled={loading}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: '#4CAF50',
+                  backgroundColor: accentColor,
                   border: 'none',
                   borderRadius: '8px',
                   cursor: loading ? 'not-allowed' : 'pointer',

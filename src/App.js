@@ -13,39 +13,37 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 
 const App = () => (
   <AuthProvider>
-    <Routes>
-      <Route path="/auth/login" element={<LoginPage />} />
-      <Route path="/auth/register" element={<RegisterPage />} />
-      <Route path="/admin/login" element={<AdminLoginPage />} />
-      <Route
-        path="/admin/dashboard"
-        element={(
-          <AdminProtectedRoute>
-            <AdminDashboard />
-          </AdminProtectedRoute>
-        )}
-      />
-      <Route
-        path="/profile/personal-info"
-        element={(
-          <ProtectedRoute>
-            <AppProvider>
+    <AppProvider>
+      <Routes>
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route
+          path="/admin/dashboard"
+          element={(
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          )}
+        />
+        <Route
+          path="/profile/personal-info"
+          element={(
+            <ProtectedRoute>
               <PersonalInfoPage />
-            </AppProvider>
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/*"
-        element={(
-          <ProtectedRoute>
-            <AppProvider>
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/*"
+          element={(
+            <ProtectedRoute>
               <AppShell />
-            </AppProvider>
-          </ProtectedRoute>
-        )}
-      />
-    </Routes>
+            </ProtectedRoute>
+          )}
+        />
+      </Routes>
+    </AppProvider>
   </AuthProvider>
 );
 

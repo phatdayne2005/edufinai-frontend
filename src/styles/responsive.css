@@ -2,6 +2,7 @@
 
 :root {
   color-scheme: light;
+  transition: background-color 0.5s ease, color 0.5s ease;
   /* Layout */
   --app-max-width: min(100vw, 640px);
   --page-padding-x: clamp(16px, 6vw, 24px);
@@ -113,6 +114,25 @@
 
 .theme-dark {
   color-scheme: dark;
+  transition: background-color 0.5s ease, color 0.5s ease;
+:root.theme-transitioning,
+.theme-dark.theme-transitioning {
+  animation: themeFade 0.45s ease;
+}
+
+@keyframes themeFade {
+  0% {
+    opacity: 0.25;
+    filter: grayscale(0.3);
+  }
+  60% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 1;
+    filter: grayscale(0);
+  }
+}
   --surface-app: #050b18;
   --surface-card: #0f172a;
   --surface-elevated: rgba(15, 23, 42, 0.8);
@@ -141,6 +161,10 @@
   --login-gradient-ring: rgba(91, 33, 182, 0.9);
   --login-gradient-sheen: rgba(15, 23, 42, 0.75);
   --login-spectrum-alpha: 0.25;
+}
+
+.theme-transition {
+  transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
 }
 
 :root[data-reduce-motion='true'] * {

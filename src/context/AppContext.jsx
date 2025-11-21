@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from 'react';
 import mockData from '../data/mockData';
 
@@ -84,6 +85,19 @@ export const AppProvider = ({ children }) => {
   const [theme, setTheme] = useState(getInitialTheme);
   const [accentColor, setAccentColor] = useState(getInitialAccent);
   const [reduceMotion, setReduceMotion] = useState(getInitialReduceMotion);
+  const transitionTimerRef = useRef(null);
+
+  const runThemeTransition = () => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.classList.add('theme-transitioning');
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+    }
+    transitionTimerRef.current = setTimeout(() => {
+      root.classList.remove('theme-transitioning');
+    }, 450);
+  };
 
   const setThemeSafe = (newTheme) => {
     const normalized = normalizeThemeValue(newTheme);
@@ -96,6 +110,7 @@ export const AppProvider = ({ children }) => {
     themeClassList.forEach((cls) => root.classList.remove(cls));
     root.classList.add(`theme-${theme}`);
     writeStorage(STORAGE_KEYS.theme, theme);
+    runThemeTransition();
   }, [theme]);
 
   useEffect(() => {
@@ -108,6 +123,7 @@ export const AppProvider = ({ children }) => {
     root.style.setProperty('--accent-saturation', `${accentTokens.saturation}%`);
     root.style.setProperty('--accent-lightness', `${accentTokens.lightness}%`);
     writeStorage(STORAGE_KEYS.accent, accentColor);
+    runThemeTransition();
   }, [accentColor]);
 
   useEffect(() => {
@@ -115,6 +131,14 @@ export const AppProvider = ({ children }) => {
     document.documentElement.dataset.reduceMotion = reduceMotion ? 'true' : 'false';
     writeStorage(STORAGE_KEYS.reduceMotion, String(reduceMotion));
   }, [reduceMotion]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
 
   const value = useMemo(
     () => ({

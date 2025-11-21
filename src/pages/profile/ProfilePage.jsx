@@ -10,7 +10,6 @@ import { askQuestion } from '../../services/aiService';
 const menuItems = [
   { icon: '🔔', label: 'Thông báo' },
   { icon: '🔒', label: 'Bảo mật' },
-  { icon: '🌙', label: 'Giao diện tối' },
   { icon: '❓', label: 'Trợ giúp' },
 ];
 
@@ -140,30 +139,14 @@ const ProfilePage = () => {
         <button
           type="button"
           onClick={() => navigate('/profile/personal-info')}
-          style={{
-            width: '100%',
-            padding: '16px',
-            backgroundColor: '#fff',
-            border: '1px solid #E0E0E0',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            transition: 'all 0.3s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#F5F5F5';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#fff';
-          }}
+          style={styles.menuItem}
+          className="card-interactive"
         >
           <div style={styles.menuLeft}>
             <span style={styles.menuIcon}>👤</span>
             <span style={styles.menuLabel}>Thông tin cá nhân</span>
           </div>
-          <ChevronRight size={20} color="#666" />
+          <ChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
         </button>
       </div>
 
@@ -235,23 +218,35 @@ const ProfilePage = () => {
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>Cài đặt</h3>
         {menuItems.map((item) => (
-          <div key={item.label} style={styles.menuItem}>
+          <div key={item.label} style={styles.menuItem} className="card-interactive">
             <div style={styles.menuLeft}>
               <span style={styles.menuIcon}>{item.icon}</span>
               <span style={styles.menuLabel}>{item.label}</span>
             </div>
-            <ChevronRight size={20} color="#666" />
+            <ChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
           </div>
         ))}
       </div>
 
-      <button 
-        type="button" 
-        style={styles.logoutButton}
-        onClick={handleLogout}
-      >
-        Đăng xuất
-      </button>
+      <div style={styles.section}>
+        <button
+          type="button"
+          style={{
+            ...styles.menuItem,
+            backgroundColor: 'var(--color-danger)',
+            marginBottom: 0,
+            width: '918px',
+          }}
+          className="card-interactive"
+          onClick={handleLogout}
+        >
+          <div style={styles.menuLeft}>
+            <span style={styles.menuIcon}>🚪</span>
+            <span style={styles.menuLabel}>Đăng xuất</span>
+          </div>
+          <ChevronRight size={20} style={{ color: '#fff' }} />
+        </button>
+      </div>
     </div>
   );
 };

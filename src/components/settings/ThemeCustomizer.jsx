@@ -66,42 +66,27 @@ const ThemeCustomizer = () => {
         <div style={styles.themeAccentGrid}>
           {accentOptions.map((option) => {
             const accentColorValue = `hsl(${option.hue}, ${option.saturation}%, ${option.lightness}%)`;
+            const isActive = accentColor === option.id;
             return (
               <button
                 key={option.id}
                 type="button"
+                aria-label={`Chọn màu ${option.label}`}
                 onClick={() => setAccentColor(option.id)}
                 style={{
                   ...styles.accentButton,
-                  ...(accentColor === option.id ? styles.accentButtonActive : {}),
+                  ...(isActive ? styles.accentButtonActive : {}),
                 }}
               >
                 <div
                   style={{
                     ...styles.accentSwatch,
+                    ...(isActive ? styles.accentSwatchActive : {}),
                     backgroundColor: accentColorValue,
                   }}
-                />
-                <span style={styles.accentLabel}>{option.label}</span>
-                {accentColor === option.id && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                    }}
-                  >
-                    ✓
-                  </div>
-                )}
+                >
+                  {isActive && <div style={styles.accentCheck}>✓</div>}
+                </div>
               </button>
             );
           })}
