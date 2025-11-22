@@ -82,7 +82,7 @@ const HomePage = () => {
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>Mục tiêu tài chính</h3>
-              <ChevronRight size={20} color="#4CAF50" />
+              <ChevronRight size={20} color="var(--color-primary)" />
             </div>
             {activeGoals.map((goal) => (
               <div key={goal.id} style={{ ...styles.goalCard, transition: 'all 0.3s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(4px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(99, 102, 241, 0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
@@ -110,7 +110,7 @@ const HomePage = () => {
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>Giao dịch gần đây</h3>
-              <ChevronRight size={20} color="#4CAF50" />
+              <ChevronRight size={20} color="var(--color-primary)" />
             </div>
             {recentExpenses.map((exp) => (
               <div key={exp.id} style={{ ...styles.transactionItem, transition: 'all 0.3s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface-muted)'; e.currentTarget.style.transform = 'translateX(4px)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.transform = 'translateX(0)'; }}>
@@ -154,7 +154,7 @@ const HomePage = () => {
                     background: 'none',
                     padding: 0,
                     cursor: isLoadingReport ? 'not-allowed' : 'pointer',
-                    color: '#4CAF50',
+                    color: 'var(--color-primary)',
                     display: 'flex',
                     alignItems: 'center',
                   }}
@@ -185,7 +185,7 @@ const HomePage = () => {
                     style={{
                       marginTop: 8,
                       border: 'none',
-                      background: '#4CAF50',
+                      backgroundImage: 'var(--gradient-brand)',
                       color: '#fff',
                       padding: '6px 12px',
                       borderRadius: 8,
@@ -208,7 +208,7 @@ const HomePage = () => {
                     </p>
                   )}
                   {dailyReport.priorityAction && (
-                    <p style={{ ...styles.aiTipText, fontWeight: 600, color: '#4CAF50' }}>
+                    <p style={{ ...styles.aiTipText, fontWeight: 600, color: 'var(--color-primary)' }}>
                       Ưu tiên: {dailyReport.priorityAction}
                     </p>
                   )}

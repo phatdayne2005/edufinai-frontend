@@ -166,14 +166,14 @@
 
   50% {
     transform: scale(1);
-    filter: hue-rotate(40deg);
+    filter: hue-rotate(180deg);
     opacity: 1;
   }
 
   100% {
-    transform: scale(0.8);
-    filter: hue-rotate(80deg);
-    opacity: 0.8;
+    transform: scale(0.65);
+    filter: hue-rotate(360deg);
+    opacity: 0.75;
   }
 }
 
@@ -181,16 +181,19 @@
   0% {
     transform: scale(1);
     opacity: 0.5;
+    filter: hue-rotate(360deg);
   }
 
   50% {
     transform: scale(0.75);
     opacity: 0.3;
+    filter: hue-rotate(180deg);
   }
 
   100% {
-    transform: scale(1.1);
-    opacity: 0.45;
+    transform: scale(1);
+    opacity: 0.5;
+    filter: hue-rotate(0deg);
   }
 }
 
