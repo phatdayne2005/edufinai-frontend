@@ -40,6 +40,8 @@ const ThemeCustomizer = () => {
                 ...styles.themeOptionButton,
                 ...(theme === option.id ? styles.themeOptionActive : {}),
               }}
+              data-pressed={theme === option.id}
+              className="card-interactive"
             >
               {option.id === 'light' ? (
                 <Sun size={24} style={{ marginBottom: '8px' }} />
@@ -76,7 +78,10 @@ const ThemeCustomizer = () => {
                 style={{
                   ...styles.accentButton,
                   ...(isActive ? styles.accentButtonActive : {}),
+                  '--card-interactive-color': accentColorValue,
                 }}
+                data-pressed={isActive}
+                className="card-interactive"
               >
                 <div
                   style={{

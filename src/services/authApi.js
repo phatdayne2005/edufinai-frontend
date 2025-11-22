@@ -18,18 +18,18 @@ const getToken = () => {
 const handleResponse = async (response) => {
     // Clone response to read it multiple times if needed
     const responseClone = response.clone();
-    
+
     // Parse JSON response
     let data;
     try {
         // Read response as text first, then parse
         const text = await response.text();
         console.log('Response text:', text);
-        
+
         if (!text || text.trim() === '') {
             throw new Error('Empty response from server');
         }
-        
+
         data = JSON.parse(text);
         console.log('Parsed response data:', data);
     } catch (e) {
@@ -43,7 +43,7 @@ const handleResponse = async (response) => {
             throw new Error(`Invalid response from server: HTTP ${response.status} - ${e.message}`);
         }
     }
-    
+
     // Check if response is ok (status 200-299)
     if (!response.ok) {
         const errorMessage = data.message || data.error || `HTTP ${response.status}: ${response.statusText}`;
@@ -58,13 +58,13 @@ const handleResponse = async (response) => {
         error.status = response.status;
         throw error;
     }
-    
+
     // Check if response has success code
     if (data.code === 1000) {
         console.log('API success response:', data);
         return data;
     }
-    
+
     // Handle error response with code (even if status is 200)
     const errorMessage = data.message || data.error || 'An error occurred';
     console.error('API error (status 200 but code not 1000):', {
@@ -134,16 +134,16 @@ const apiRequest = async (endpoint, options = {}, requireAuth = false) => {
         hasBody: !!config.body,
         bodyPreview: config.body ? config.body.substring(0, 200) : null,
     });
-    
+
     const response = await fetch(`${AUTH_BASE_URL}${endpoint}`, config);
-    
+
     console.log('API response:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
         headers: Object.fromEntries(response.headers.entries()),
     });
-    
+
     return handleResponse(response);
 };
 
@@ -178,6 +178,45 @@ export const logout = async (token = null) => {
         body: { token: tokenToLogout },
     }, false);
     return response.result;
+};
+
+/**
+ * Forgot Password - Quên mật khẩu
+ * API: POST http://localhost:8080/auth/auth/forgot-password
+ * Request: { email: string }
+ */
+export const forgotPassword = async (email) => {
+    const response = await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: { email },
+    }, false);
+    return response;
+};
+
+/**
+ * Verify OTP - Xác thực OTP
+ * API: POST http://localhost:8080/auth/auth/verify-otp
+ * Request: { email: string, otp: string }
+ */
+export const verifyOtp = async (email, otp) => {
+    const response = await apiRequest('/auth/verify-otp', {
+        method: 'POST',
+        body: { email, otp },
+    }, false);
+    return response.result;
+};
+
+/**
+ * Reset Password - Đặt lại mật khẩu
+ * API: POST http://localhost:8080/auth/auth/reset-password
+ * Request: { email: string, otp: string, newPassword: string }
+ */
+export const resetPassword = async (email, otp, newPassword) => {
+    const response = await apiRequest('/auth/reset-password', {
+        method: 'POST',
+        body: { email, otp, newPassword },
+    }, false);
+    return response;
 };
 
 // ============================================================================

@@ -231,12 +231,7 @@ const ProfilePage = () => {
       <div style={styles.section}>
         <button
           type="button"
-          style={{
-            ...styles.menuItem,
-            backgroundColor: 'var(--color-danger)',
-            marginBottom: 0,
-            width: '918px',
-          }}
+          style={{ ...styles.profileLogoutButton, marginBottom: 0 }}
           className="card-interactive"
           onClick={handleLogout}
         >

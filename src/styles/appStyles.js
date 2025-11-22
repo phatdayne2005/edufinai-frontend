@@ -52,8 +52,10 @@ const cardBase = {
   border: `1px solid ${palette.border}`,
   borderRadius: radius.md,
   padding: spacing.lg,
-  boxShadow: 'var(--shadow-xs)',
+  boxShadow: 'var(--shadow-sm)',
   transition: `transform ${transitions.soft}, box-shadow ${transitions.soft}, border-color ${transitions.soft}`,
+  position: 'relative',
+  overflow: 'hidden',
 };
 
 const softCard = {
@@ -66,14 +68,36 @@ const softCard = {
 const frostedCard = {
   ...cardBase,
   background: palette.elevated,
-  boxShadow: 'var(--shadow-sm)',
-  backdropFilter: 'blur(18px)',
+  boxShadow: 'var(--shadow-md)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: `1px solid ${palette.borderStrong}`,
 };
 
 const interactiveCard = {
   ...cardBase,
   cursor: 'pointer',
   transition: `transform ${transitions.soft}, box-shadow ${transitions.soft}, border-color ${transitions.soft}`,
+  ':hover': {
+    transform: 'translateY(-4px)',
+    boxShadow: 'var(--shadow-hover)',
+    borderColor: palette.primary,
+  },
+};
+
+const logoutButtonBase = {
+  ...interactiveCard,
+  backgroundColor: palette.danger,
+  border: 'none',
+  color: '#fff',
+  marginTop: spacing.lg,
+  minHeight: '88px',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  fontSize: 'var(--font-size-md)',
+  boxShadow: 'var(--shadow-md)',
+  background: `linear-gradient(135deg, ${palette.danger}, #dc2626)`,
 };
 
 const textMuted = {
@@ -87,6 +111,7 @@ const pill = {
   fontWeight: 600,
   backgroundColor: palette.primarySoft,
   color: palette.primary,
+  letterSpacing: '0.02em',
 };
 
 const buttonBase = {
@@ -96,31 +121,43 @@ const buttonBase = {
   fontSize: 'var(--font-size-md)',
   border: 'none',
   cursor: 'pointer',
-  transition: `transform ${transitions.soft}, box-shadow ${transitions.soft}, background ${transitions.soft}`,
+  transition: `transform ${transitions.soft}, box-shadow ${transitions.soft}, filter ${transitions.soft}`,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: spacing.xs,
+  position: 'relative',
+  overflow: 'hidden',
 };
 
 const primaryButton = {
   ...buttonBase,
   backgroundImage: 'var(--gradient-brand)',
   color: '#fff',
-  boxShadow: 'var(--shadow-sm)',
+  boxShadow: 'var(--shadow-md)',
+  textShadow: '0 1px 2px rgba(0,0,0,0.1)',
 };
 
 const outlineButton = {
   ...buttonBase,
   backgroundColor: 'transparent',
-  border: `1px solid ${palette.border}`,
+  border: `1px solid ${palette.borderStrong}`,
   color: palette.textPrimary,
+  ':hover': {
+    borderColor: palette.primary,
+    color: palette.primary,
+    backgroundColor: palette.primarySoft,
+  },
 };
 
 const ghostButton = {
   ...buttonBase,
   backgroundColor: 'transparent',
   color: palette.textSecondary,
+  ':hover': {
+    backgroundColor: palette.muted,
+    color: palette.textPrimary,
+  },
 };
 
 export const styles = {
@@ -130,6 +167,8 @@ export const styles = {
     fontFamily: typography.base,
     paddingBottom: 'var(--bottom-nav-height, 90px)',
     transition: `background ${transitions.fade}`,
+    backgroundImage: 'radial-gradient(circle at 50% 0%, var(--color-primary-glow), transparent 70%)',
+    backgroundAttachment: 'fixed',
   },
   main: {
     maxWidth: 'var(--app-max-width, 640px)',
@@ -180,6 +219,9 @@ export const styles = {
     color: palette.textPrimary,
     fontFamily: typography.display,
     letterSpacing: '-0.02em',
+    background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
   },
   headerSubtitle: {
     ...textMuted,
@@ -193,16 +235,17 @@ export const styles = {
     transform: 'var(--bottom-nav-translate, translateX(-50%))',
     maxWidth: 'var(--bottom-nav-width, 640px)',
     width: 'min(100%, var(--bottom-nav-width, 640px))',
-    height: '76px',
+    height: '80px',
     display: 'flex',
     justifyContent: 'space-around',
     alignItems: 'center',
-    border: `1px solid ${palette.border}`,
-    boxShadow: 'var(--shadow-md)',
+    border: `1px solid ${palette.borderStrong}`,
+    boxShadow: 'var(--shadow-elevated)',
     zIndex: 1000,
     borderRadius: 'var(--bottom-nav-radius, 0px)',
     padding: 'var(--bottom-nav-padding, 0 16px)',
-    backdropFilter: 'blur(18px)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
     background: palette.elevated,
   },
   navButton: {
@@ -750,18 +793,15 @@ export const styles = {
     color: '#fff',
   },
   logoutButton: {
-    ...interactiveCard,
+    ...logoutButtonBase,
     width: '100%',
-    backgroundColor: palette.danger,
-    border: 'none',
-    color: '#fff',
-    marginTop: spacing.lg,
-    minHeight: '88px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    fontSize: 'var(--font-size-md)',
-    boxShadow: 'var(--shadow-md)',
+  },
+  profileLogoutButton: {
+    ...logoutButtonBase,
+    width: '918px',
+    minWidth: '918px',
+    maxWidth: '918px',
+    alignSelf: 'center',
   },
   infoCard: {
     ...cardBase,
