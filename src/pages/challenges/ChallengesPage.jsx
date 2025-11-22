@@ -179,7 +179,7 @@ const ChallengesPage = () => {
             disabled={refreshing}
             style={{
               padding: '8px 12px',
-              backgroundColor: '#007bff',
+              backgroundImage: 'var(--gradient-brand)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -204,8 +204,9 @@ const ChallengesPage = () => {
               onClick={() => setSelectedType(type.value)}
               style={{
                 padding: '8px 16px',
-                backgroundColor: selectedType === type.value ? '#007bff' : '#f0f0f0',
-                color: selectedType === type.value ? 'white' : '#333',
+                backgroundColor: selectedType === type.value ? 'transparent' : 'var(--surface-muted)',
+                backgroundImage: selectedType === type.value ? 'var(--gradient-brand)' : 'none',
+                color: selectedType === type.value ? 'white' : 'var(--text-primary)',
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',

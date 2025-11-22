@@ -242,7 +242,7 @@ const AdminDashboard = () => {
       gap: '24px',
     },
     heroCard: {
-      background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+      background: 'var(--gradient-hero)',
       borderRadius: '28px',
       padding: '32px',
       color: '#fff',
@@ -251,7 +251,7 @@ const AdminDashboard = () => {
       gap: '24px',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      boxShadow: '0 25px 60px rgba(76, 175, 80, 0.35)',
+      boxShadow: '0 25px 60px rgba(15, 23, 42, 0.15)',
     },
     heroText: {
       maxWidth: '560px',
@@ -317,8 +317,8 @@ const AdminDashboard = () => {
     heroButton: {
       border: 'none',
       borderRadius: '999px',
-      backgroundColor: '#fff',
-      color: '#2E7D32',
+      backgroundColor: 'var(--surface-card)',
+      color: 'var(--color-primary)',
       padding: '12px 28px',
       fontSize: '14px',
       fontWeight: 600,
@@ -361,22 +361,22 @@ const AdminDashboard = () => {
       gap: '10px',
     },
     roleBadge: {
-      backgroundColor: '#fff',
-      border: '1px solid #E8EFE5',
+      backgroundColor: 'var(--surface-card)',
+      border: '1px solid var(--border-subtle)',
       borderRadius: '999px',
       padding: '10px 18px',
       fontSize: '13px',
       fontWeight: 600,
-      color: '#1B5E20',
-      boxShadow: '0 6px 14px rgba(27, 94, 32, 0.08)',
+      color: 'var(--text-secondary)',
+      boxShadow: 'var(--shadow-xs)',
       cursor: 'pointer',
       transition: 'all 0.2s',
     },
     roleBadgeActive: {
-      backgroundColor: '#2E7D32',
+      backgroundColor: 'var(--color-primary)',
       color: '#fff',
       borderColor: 'transparent',
-      boxShadow: '0 8px 18px rgba(46, 125, 50, 0.3)',
+      boxShadow: 'var(--shadow-md)',
     },
     roleBadgeAll: {
       backgroundColor: '#fff',
@@ -462,11 +462,11 @@ const AdminDashboard = () => {
       padding: '12px 22px',
       borderRadius: '14px',
       border: 'none',
-      backgroundColor: '#2E7D32',
+      backgroundImage: 'var(--gradient-brand)',
       color: '#fff',
       fontWeight: 600,
       cursor: 'pointer',
-      boxShadow: '0 10px 25px rgba(46, 125, 50, 0.3)',
+      boxShadow: 'var(--shadow-md)',
     },
     tableCard: {
       backgroundColor: '#fff',
@@ -575,9 +575,9 @@ const AdminDashboard = () => {
 
   const primaryButton = {
     ...buttonStyle,
-    backgroundColor: '#2E7D32',
+    backgroundImage: 'var(--gradient-brand)',
     color: '#fff',
-    boxShadow: '0 8px 18px rgba(46, 125, 50, 0.25)',
+    boxShadow: 'var(--shadow-md)',
   };
 
   const dangerButton = {

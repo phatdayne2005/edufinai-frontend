@@ -93,10 +93,10 @@
   --color-danger: #ef4444;
   --color-info: #3b82f6;
   --color-secondary: #64748b;
-  --gradient-brand: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-brand: linear-gradient(135deg, hsl(var(--accent-hue), var(--accent-saturation), var(--accent-lightness)) 0%, hsl(calc(var(--accent-hue) + 20), var(--accent-saturation), calc(var(--accent-lightness) - 10%)) 100%);
   --gradient-muted: linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%);
-  --gradient-hero: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  --gradient-cta: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(var(--accent-hue), var(--accent-saturation), calc(var(--accent-lightness) - 10%)) 0%, hsl(calc(var(--accent-hue) + 20), var(--accent-saturation), calc(var(--accent-lightness) - 20%)) 100%);
+  --gradient-cta: linear-gradient(135deg, hsl(var(--accent-hue), var(--accent-saturation), calc(var(--accent-lightness) - 15%)) 0%, hsl(calc(var(--accent-hue) + 20), var(--accent-saturation), calc(var(--accent-lightness) - 25%)) 100%);
   /* AI Card gradients */
   --ai-card-gradient-start: #eef2ff;
   --ai-card-gradient-end: #f5f3ff;
@@ -105,8 +105,8 @@
   --ai-card-foreground: #312e81;
   --ai-card-foreground-muted: #4338ca;
   /* Login gradient */
-  --login-gradient-core: #8b5cf6;
-  --login-gradient-ring: rgba(79, 70, 229, 0.8);
+  --login-gradient-core: hsl(var(--accent-hue), var(--accent-saturation), var(--accent-lightness));
+  --login-gradient-ring: hsla(var(--accent-hue), var(--accent-saturation), calc(var(--accent-lightness) - 10%), 0.8);
   --login-gradient-sheen: rgba(255, 255, 255, 0.9);
   --login-spectrum-alpha: 0.4;
   --login-spectrum-angle: 0deg;
@@ -141,8 +141,8 @@
   --ai-card-foreground: #e0e7ff;
   --ai-card-foreground-muted: #c7d2fe;
   /* Login Dark */
-  --login-gradient-core: #7c3aed;
-  --login-gradient-ring: rgba(67, 56, 202, 0.8);
+  --login-gradient-core: hsl(var(--accent-hue), var(--accent-saturation), var(--accent-lightness));
+  --login-gradient-ring: hsla(var(--accent-hue), var(--accent-saturation), calc(var(--accent-lightness) - 10%), 0.8);
   --login-gradient-sheen: rgba(30, 41, 59, 0.8);
   --login-spectrum-alpha: 0.3;
 }
@@ -358,6 +358,17 @@
     opacity: 1;
     transform: translateX(0) scale(1);
     filter: blur(0);
+  }
+}
+
+@keyframes tab-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
