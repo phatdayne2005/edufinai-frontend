@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as adminApi from '../../services/authApi';
 import * as gamificationApi from '../../services/gamificationApi';
+import { styles } from '../../styles/appStyles';
 import { 
   Users, 
   Shield, 
@@ -373,7 +374,7 @@ const AdminDashboard = () => {
   const dashboardStyles = {
     page: {
       minHeight: '100vh',
-      backgroundColor: 'var(--surface-app)',
+      backgroundColor: 'transparent',
       padding: '32px 16px 48px',
       color: 'var(--text-primary)',
     },
@@ -864,8 +865,9 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div style={dashboardStyles.page}>
-      <div style={dashboardStyles.main}>
+    <div style={{ ...styles.app, paddingBottom: 0 }}>
+      <div style={dashboardStyles.page}>
+        <div style={dashboardStyles.main}>
         <section style={dashboardStyles.heroCard}>
           <div style={dashboardStyles.heroText}>
             <div style={dashboardStyles.heroBadge}>
@@ -1539,6 +1541,7 @@ const AdminDashboard = () => {
           }
         `}
         </style>
+      </div>
     </div>
   );
 };
