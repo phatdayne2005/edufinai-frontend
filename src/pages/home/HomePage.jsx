@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Target, ChevronRight, Brain, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, Target, ChevronRight, Brain, Loader2, RefreshCw, AlertCircle, PenTool, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { getDailyReport } from '../../services/aiService';
 
 const HomePage = () => {
+  const navigate = useNavigate();
   const { user: mockUser, goals, expenses } = useApp();
   const { user: authUser } = useAuth();
   const activeGoals = goals.filter((goal) => goal.status === 'ACTIVE');
@@ -38,9 +40,48 @@ const HomePage = () => {
   // Use mock data for financial information (balance, income, expense, savingRate)
   const financialData = mockUser;
 
+  // Role Check Logic
+  const roles = authUser?.roles || [];
+  const hasRole = (roleName) => {
+    return roles.some(r => {
+      const rName = typeof r === 'string' ? r : r.name;
+      return rName && rName.toUpperCase().includes(roleName);
+    });
+  };
+
+  const isCreator = hasRole('CREATOR');
+  const isMod = hasRole('MOD');
+
+  const headerAction = (isCreator || isMod) ? (
+    <div className="flex gap-2">
+      {isCreator && (
+        <button
+          onClick={() => navigate('/creator/dashboard')}
+          className="px-3 py-2 bg-purple-100 text-purple-700 rounded-xl font-semibold hover:bg-purple-200 transition-colors text-sm flex items-center gap-2"
+        >
+           <PenTool size={16} />
+           <span className="hidden sm:inline">Creator</span>
+        </button>
+      )}
+      {isMod && (
+        <button
+          onClick={() => navigate('/mod/dashboard')}
+          className="px-3 py-2 bg-blue-100 text-blue-700 rounded-xl font-semibold hover:bg-blue-200 transition-colors text-sm flex items-center gap-2"
+        >
+           <Shield size={16} />
+           <span className="hidden sm:inline">Moderator</span>
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="w-full max-w-[1240px] mx-auto px-4 py-4 md:py-7 flex flex-col gap-6 box-border">
-      <Header title="Xin chào!" subtitle={`Chào mừng trở lại, ${displayName}`} />
+      <Header 
+        title="Xin chào!" 
+        subtitle={`Chào mừng trở lại, ${displayName}`} 
+        action={headerAction}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         <div className="flex flex-col gap-6">

@@ -11,6 +11,8 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import PersonalInfoPage from './pages/profile/PersonalInfoPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import CreatorDashboard from './pages/creator/CreatorDashboard';
+import ModDashboard from './pages/mod/ModDashboard';
 
 const App = () => (
   <AuthProvider>
@@ -26,6 +28,22 @@ const App = () => (
             <AdminProtectedRoute>
               <AdminDashboard />
             </AdminProtectedRoute>
+          )}
+        />
+        <Route
+          path="/creator/dashboard"
+          element={(
+            <ProtectedRoute>
+              <CreatorDashboard />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/mod/dashboard"
+          element={(
+            <ProtectedRoute>
+              <ModDashboard />
+            </ProtectedRoute>
           )}
         />
         <Route
