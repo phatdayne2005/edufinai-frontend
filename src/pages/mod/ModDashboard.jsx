@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, AlertCircle, CheckCircle, XCircle, Loader2, Eye, X } from 'lucide-react';
 import { getPendingLessons, moderateLesson } from '../../services/learningApi';
 
 const ModDashboard = () => {
   const navigate = useNavigate();
   const [pendingLessons, setPendingLessons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedLesson, setSelectedLesson] = useState(null); // For view detail modal
 
   const fetchPending = async () => {
     try {
@@ -32,6 +33,7 @@ const ModDashboard = () => {
           try {
               await moderateLesson(lessonId, status, comment);
               alert('Đã từ chối bài viết');
+              setSelectedLesson(null);
               fetchPending();
           } catch (err) {
               alert('Lỗi khi từ chối bài viết');
@@ -41,6 +43,7 @@ const ModDashboard = () => {
           try {
               await moderateLesson(lessonId, status, null);
               alert('Đã duyệt bài viết');
+              setSelectedLesson(null);
               fetchPending();
           } catch (err) {
               alert('Lỗi khi duyệt bài viết');
@@ -184,6 +187,17 @@ const ModDashboard = () => {
         display: 'flex',
         gap: '8px',
     },
+    btnDetail: {
+        padding: '8px',
+        borderRadius: '8px',
+        border: 'none',
+        backgroundColor: 'var(--surface-muted)',
+        color: 'var(--text-primary)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+    },
     btnApprove: {
         padding: '8px 16px',
         borderRadius: '8px',
@@ -208,6 +222,64 @@ const ModDashboard = () => {
         alignItems: 'center',
         gap: '4px',
     },
+    modalOverlay: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+        backdropFilter: 'blur(4px)',
+    },
+    modalContent: {
+        backgroundColor: 'var(--surface-card)',
+        padding: '32px',
+        borderRadius: '24px',
+        width: '100%',
+        maxWidth: '600px',
+        maxHeight: '80vh',
+        overflowY: 'auto',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        color: 'var(--text-primary)',
+    },
+    modalHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '24px',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '16px',
+    },
+    modalTitle: {
+        fontSize: '20px',
+        fontWeight: '700',
+        margin: 0,
+    },
+    closeButton: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--text-muted)',
+    },
+    detailRow: {
+        marginBottom: '16px',
+    },
+    detailLabel: {
+        fontWeight: '600',
+        color: 'var(--text-secondary)',
+        fontSize: '14px',
+        marginBottom: '4px',
+        display: 'block',
+    },
+    detailValue: {
+        color: 'var(--text-primary)',
+        fontSize: '16px',
+        lineHeight: '1.5',
+    }
   };
 
   return (
@@ -278,6 +350,13 @@ const ModDashboard = () => {
                             </div>
                             <div style={styles.actionButtons}>
                                 <button 
+                                    style={styles.btnDetail}
+                                    onClick={() => setSelectedLesson(lesson)}
+                                    title="Xem chi tiết"
+                                >
+                                    <Eye size={16} />
+                                </button>
+                                <button 
                                     style={styles.btnApprove}
                                     onClick={() => handleModerate(lesson.id, 'APPROVED')}
                                 >
@@ -300,6 +379,60 @@ const ModDashboard = () => {
             )}
         </div>
       </div>
+
+      {selectedLesson && (
+        <div style={styles.modalOverlay} onClick={() => setSelectedLesson(null)}>
+            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                <div style={styles.modalHeader}>
+                    <div>
+                        <h2 style={styles.modalTitle}>{selectedLesson.title}</h2>
+                        <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                            ID: {selectedLesson.id} • {new Date(selectedLesson.createdAt).toLocaleString('vi-VN')}
+                        </span>
+                    </div>
+                    <button style={styles.closeButton} onClick={() => setSelectedLesson(null)}>
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Tác giả</span>
+                    <div style={styles.detailValue}>{selectedLesson.creator?.username || 'Unknown'}</div>
+                </div>
+                
+                <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Mô tả</span>
+                    <div style={styles.detailValue}>{selectedLesson.description}</div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '24px' }}>
+                    <div style={styles.detailRow}>
+                        <span style={styles.detailLabel}>Độ khó</span>
+                        <div style={styles.detailValue}>{selectedLesson.difficulty}</div>
+                    </div>
+                    <div style={styles.detailRow}>
+                        <span style={styles.detailLabel}>Thời gian ước tính</span>
+                        <div style={styles.detailValue}>{selectedLesson.timeEstimate} phút</div>
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                    <button 
+                        style={styles.btnReject}
+                        onClick={() => handleModerate(selectedLesson.id, 'REJECTED')}
+                    >
+                        <XCircle size={16} /> Từ chối
+                    </button>
+                    <button 
+                        style={styles.btnApprove}
+                        onClick={() => handleModerate(selectedLesson.id, 'APPROVED')}
+                    >
+                        <CheckCircle size={16} /> Duyệt bài
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
