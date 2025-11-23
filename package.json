@@ -49,5 +49,9 @@
     "postcss": "^8.4.38",
     "resolve-url-loader": "^5.0.0",
     "webpack-dev-server": "^4.15.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.22",
+    "tailwindcss": "^3.4.1"
   }
 }
