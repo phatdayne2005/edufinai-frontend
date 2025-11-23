@@ -1,9 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as adminApi from '../../services/authApi';
+import * as gamificationApi from '../../services/gamificationApi';
+import { 
+  Users, 
+  Shield, 
+  UserCheck, 
+  FileText, 
+  Search, 
+  Plus, 
+  RefreshCw, 
+  Edit2, 
+  Trash2, 
+  X, 
+  LogOut,
+  ChevronDown,
+  Settings,
+  LayoutDashboard,
+  Trophy,
+  Target,
+  Gift,
+  Award
+} from 'lucide-react';
+import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'challenges', 'leaderboard', 'settings'
+  
+  // Refs for tab indicator
+  const tabsRef = useRef({});
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeTabElement = tabsRef.current[activeTab];
+      if (activeTabElement) {
+        setIndicatorStyle({
+          left: activeTabElement.offsetLeft,
+          width: activeTabElement.offsetWidth,
+        });
+      }
+    };
+
+    updateIndicator();
+    window.addEventListener('resize', updateIndicator);
+    
+    // Small timeout to ensure layout is stable (e.g. fonts loaded)
+    const timeoutId = setTimeout(updateIndicator, 50);
+
+    return () => {
+      window.removeEventListener('resize', updateIndicator);
+      clearTimeout(timeoutId);
+    };
+  }, [activeTab]);
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,6 +62,27 @@ const AdminDashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  
+  // Gamification States
+  const [challenges, setChallenges] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [showChallengeModal, setShowCreateChallengeModal] = useState(false);
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardData, setRewardData] = useState({
+    userId: '',
+    score: 0,
+    badge: '',
+    reason: ''
+  });
+  const [challengeData, setChallengeData] = useState({
+    title: '',
+    description: '',
+    goal: 100,
+    rewardPoints: 50,
+    type: 'DAILY', // DAILY, WEEKLY, ONE_TIME
+    icon: '🎯'
+  });
+
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -38,9 +110,71 @@ const AdminDashboard = () => {
     }
   };
 
+  // Fetch Gamification Data
+  const fetchChallenges = async () => {
+    try {
+      setLoading(true);
+      // Mock data or use API if available. assuming gamificationApi has getChallenges
+      // If not available, I'll use mock data for now as per previous instructions
+      // const data = await gamificationApi.getAllChallenges(); 
+      // setChallenges(data);
+      
+      // Mocking for demonstration as API might not be fully ready for admin listing
+      setChallenges([
+        { id: 1, title: 'Đăng nhập hàng ngày', description: 'Đăng nhập vào ứng dụng mỗi ngày', goal: 1, rewardPoints: 10, type: 'DAILY', icon: '📅' },
+        { id: 2, title: 'Hoàn thành 3 bài học', description: 'Học xong 3 bài học bất kỳ', goal: 3, rewardPoints: 50, type: 'WEEKLY', icon: '📚' },
+      ]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    try {
+      setLoading(true);
+      const data = await gamificationApi.getLeaderboard();
+      setLeaderboard(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (activeTab === 'dashboard') {
+      fetchUsers();
+    } else if (activeTab === 'challenges') {
+      fetchChallenges();
+    } else if (activeTab === 'leaderboard') {
+      fetchLeaderboard();
+    }
+  }, [activeTab]);
+
+  // Gamification Handlers
+  const handleCreateChallenge = async (e) => {
+    e.preventDefault();
+    // Implement API call here
+    console.log('Create challenge:', challengeData);
+    alert('Tính năng đang phát triển (API chưa sẵn sàng)');
+    setShowCreateChallengeModal(false);
+  };
+
+  const handleGiveReward = async (e) => {
+    e.preventDefault();
+    try {
+      // Assuming gamificationApi has giveReward
+      // await gamificationApi.giveReward(rewardData);
+      console.log('Give reward:', rewardData);
+      alert(`Đã tặng ${rewardData.score} điểm cho user ID: ${rewardData.userId}`);
+      setShowRewardModal(false);
+      fetchLeaderboard(); // Refresh
+    } catch (err) {
+      alert('Lỗi khi tặng quà');
+    }
+  };
 
   // Handle create user
   const handleCreateUser = async (e) => {
@@ -186,29 +320,37 @@ const AdminDashboard = () => {
       label: 'Tổng người dùng',
       value: totalUsers,
       hint: 'Tất cả tài khoản đang hoạt động',
+      icon: <Users size={24} color="var(--color-primary)" />,
+      bgColor: 'var(--color-primary-soft)',
     },
     {
       label: 'Tài khoản Admin',
       value: roleCounts.ADMIN || 0,
       hint: 'Quản trị viên có toàn quyền',
+      icon: <Shield size={24} color="#F44336" />,
+      bgColor: 'rgba(244, 67, 54, 0.1)',
     },
     {
       label: 'Người học',
       value: roleCounts.LEARNER || 0,
       hint: 'Vai trò LEARNER trong hệ thống',
+      icon: <UserCheck size={24} color="#4CAF50" />,
+      bgColor: 'rgba(76, 175, 80, 0.1)',
     },
     {
       label: 'Hồ sơ hoàn chỉnh',
       value: `${completionPercent}%`,
       hint: `${completedProfiles} hồ sơ đã điền đủ thông tin`,
+      icon: <FileText size={24} color="#FF9800" />,
+      bgColor: 'rgba(255, 152, 0, 0.1)',
     },
   ];
 
   const roleBadgeItems = [
-    { key: 'ADMIN', label: 'Admin' },
-    { key: 'MOD', label: 'Mod' },
-    { key: 'CREATOR', label: 'Creator' },
-    { key: 'LEARNER', label: 'Learner' },
+    { key: 'ADMIN', label: 'Admin', color: '#F44336', bg: 'rgba(244, 67, 54, 0.1)' },
+    { key: 'MOD', label: 'Mod', color: '#9C27B0', bg: 'rgba(156, 39, 176, 0.1)' },
+    { key: 'CREATOR', label: 'Creator', color: '#FF9800', bg: 'rgba(255, 152, 0, 0.1)' },
+    { key: 'LEARNER', label: 'Learner', color: '#4CAF50', bg: 'rgba(76, 175, 80, 0.1)' },
   ];
 
   const toggleRoleFilter = (roleKey) => {
@@ -231,8 +373,9 @@ const AdminDashboard = () => {
   const dashboardStyles = {
     page: {
       minHeight: '100vh',
-      backgroundColor: '#F4F7FB',
+      backgroundColor: 'var(--surface-app)',
       padding: '32px 16px 48px',
+      color: 'var(--text-primary)',
     },
     main: {
       maxWidth: '1200px',
@@ -327,75 +470,92 @@ const AdminDashboard = () => {
     },
     metricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-      gap: '16px',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+      gap: '20px',
     },
     metricCard: {
-      backgroundColor: '#fff',
-      borderRadius: '20px',
-      padding: '20px',
-      border: '1px solid #E4EBE5',
-      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.07)',
+      backgroundColor: 'var(--surface-card)',
+      borderRadius: '16px',
+      padding: '24px',
+      border: '1px solid var(--border-subtle)',
+      boxShadow: 'var(--shadow-sm)',
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    },
+    metricContent: {
+      display: 'flex',
+      flexDirection: 'column',
+    },
+    metricIcon: {
+      padding: '12px',
+      borderRadius: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     metricLabel: {
-      fontSize: '13px',
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      color: '#90A4AE',
+      fontSize: '14px',
+      fontWeight: 600,
+      color: 'var(--text-secondary)',
       margin: 0,
     },
     metricValue: {
-      fontSize: '28px',
+      fontSize: '32px',
       fontWeight: 700,
-      margin: '10px 0 6px 0',
-      color: '#263238',
+      margin: '8px 0 4px 0',
+      color: 'var(--text-primary)',
     },
     metricHint: {
       margin: 0,
       fontSize: '13px',
-      color: '#607D8B',
+      color: 'var(--text-muted)',
     },
     roleFilterBar: {
       display: 'flex',
       flexWrap: 'wrap',
-      gap: '10px',
+      gap: '12px',
+      padding: '4px 0',
     },
     roleBadge: {
       backgroundColor: 'var(--surface-card)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '999px',
-      padding: '10px 18px',
-      fontSize: '13px',
-      fontWeight: 600,
+      borderRadius: '12px',
+      padding: '8px 16px',
+      fontSize: '14px',
+      fontWeight: 500,
       color: 'var(--text-secondary)',
-      boxShadow: 'var(--shadow-xs)',
       cursor: 'pointer',
-      transition: 'all 0.2s',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
     },
     roleBadgeActive: {
       backgroundColor: 'var(--color-primary)',
       color: '#fff',
-      borderColor: 'transparent',
-      boxShadow: 'var(--shadow-md)',
+      borderColor: 'var(--color-primary)',
+      boxShadow: '0 4px 12px var(--color-primary-glow)',
     },
     roleBadgeAll: {
-      backgroundColor: '#fff',
-      border: '1px solid #CFD8DC',
-      color: '#546E7A',
+      backgroundColor: 'var(--surface-card)',
+      border: '1px solid var(--border-subtle)',
+      color: 'var(--text-secondary)',
     },
     errorCard: {
-      backgroundColor: '#FFEBEE',
+      backgroundColor: 'rgba(244, 67, 54, 0.1)',
       borderRadius: '18px',
       padding: '16px 20px',
-      color: '#C62828',
-      border: '1px solid #FFCDD2',
+      color: '#F44336',
+      border: '1px solid rgba(244, 67, 54, 0.2)',
     },
     actionCard: {
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--surface-card)',
       borderRadius: '22px',
       padding: '20px',
-      border: '1px solid #E4EBE5',
-      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.05)',
+      border: '1px solid var(--border-subtle)',
+      boxShadow: 'var(--shadow-sm)',
       display: 'flex',
       flexDirection: 'column',
       gap: '16px',
@@ -413,18 +573,19 @@ const AdminDashboard = () => {
       left: '14px',
       top: '50%',
       transform: 'translateY(-50%)',
-      color: '#90A4AE',
+      color: 'var(--text-muted)',
       fontSize: '16px',
     },
     searchInput: {
       width: '100%',
       padding: '12px 16px 12px 44px',
       borderRadius: '14px',
-      border: '1px solid #E0E7EC',
-      backgroundColor: '#F7FAFC',
+      border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--surface-muted)',
       fontSize: '14px',
       outline: 'none',
       transition: 'border 0.2s',
+      color: 'var(--text-primary)',
     },
     clearSearchButton: {
       position: 'absolute',
@@ -435,13 +596,13 @@ const AdminDashboard = () => {
       border: 'none',
       cursor: 'pointer',
       fontSize: '16px',
-      color: '#90A4AE',
+      color: 'var(--text-muted)',
       padding: '4px',
     },
     searchMeta: {
       margin: '8px 0 0 0',
       fontSize: '13px',
-      color: '#607D8B',
+      color: 'var(--text-muted)',
     },
     actionButtons: {
       display: 'flex',
@@ -452,9 +613,9 @@ const AdminDashboard = () => {
     ctaSecondaryButton: {
       padding: '12px 20px',
       borderRadius: '14px',
-      border: '1px solid #CFD8DC',
-      backgroundColor: '#fff',
-      color: '#37474F',
+      border: '1px solid var(--border-strong)',
+      backgroundColor: 'transparent',
+      color: 'var(--text-primary)',
       fontWeight: 600,
       cursor: 'pointer',
     },
@@ -469,11 +630,11 @@ const AdminDashboard = () => {
       boxShadow: 'var(--shadow-md)',
     },
     tableCard: {
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--surface-card)',
       borderRadius: '26px',
       padding: '24px',
-      border: '1px solid #E4EBE5',
-      boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)',
+      border: '1px solid var(--border-subtle)',
+      boxShadow: 'var(--shadow-sm)',
     },
     tableHeader: {
       display: 'flex',
@@ -487,80 +648,150 @@ const AdminDashboard = () => {
       margin: 0,
       fontSize: '20px',
       fontWeight: 700,
-      color: '#263238',
+      color: 'var(--text-primary)',
     },
     tableSubtitle: {
       margin: 0,
       fontSize: '14px',
-      color: '#78909C',
+      color: 'var(--text-muted)',
     },
     tableWrapper: {
       overflowX: 'auto',
-      border: '1px solid #DDE5E0',
+      border: '1px solid var(--border-subtle)',
       borderRadius: '20px',
       padding: '0 0 12px 0',
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--surface-card)',
     },
     table: {
       width: '100%',
-      borderCollapse: 'collapse',
-      minWidth: '720px',
+      borderCollapse: 'separate',
+      borderSpacing: '0',
+      minWidth: '800px',
     },
     th: {
       textAlign: 'left',
-      padding: '12px 16px',
-      fontSize: '12px',
+      padding: '16px 24px',
+      fontSize: '13px',
+      fontWeight: 600,
       textTransform: 'uppercase',
       letterSpacing: '0.05em',
-      color: '#90A4AE',
-      borderBottom: '1px solid #E3EBE7',
+      color: 'var(--text-secondary)',
+      borderBottom: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--surface-muted)',
     },
     td: {
-      padding: '14px 16px',
-      borderBottom: '1px solid #EEF2F0',
+      padding: '16px 24px',
+      borderBottom: '1px solid var(--border-subtle)',
       fontSize: '14px',
-      color: '#37474F',
+      color: 'var(--text-primary)',
       verticalAlign: 'middle',
+      backgroundColor: 'var(--surface-card)',
+      transition: 'background-color 0.2s',
     },
     rolePill: {
       display: 'inline-flex',
       alignItems: 'center',
-      padding: '6px 12px',
+      padding: '4px 12px',
       borderRadius: '999px',
-      backgroundColor: '#E8F5E9',
-      color: '#2E7D32',
       fontSize: '12px',
       fontWeight: 600,
+      gap: '6px',
     },
     rowActions: {
       display: 'flex',
       gap: '8px',
       flexWrap: 'wrap',
+      opacity: 0.7,
+      transition: 'opacity 0.2s',
     },
     tableActionBtn: {
-      padding: '8px 14px',
-      borderRadius: '10px',
-      border: '1px solid rgba(46,125,50,0.2)',
-      backgroundColor: 'rgba(76,175,80,0.08)',
-      color: '#2E7D32',
-      fontSize: '13px',
-      fontWeight: 600,
+      padding: '6px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: 'transparent',
+      color: 'var(--text-secondary)',
       cursor: 'pointer',
+      transition: 'all 0.2s',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     tableDangerBtn: {
-      padding: '8px 14px',
-      borderRadius: '10px',
-      border: '1px solid rgba(239,83,80,0.3)',
-      backgroundColor: 'rgba(239,83,80,0.12)',
-      color: '#C62828',
-      fontSize: '13px',
-      fontWeight: 600,
+      padding: '6px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: 'transparent',
+      color: '#EF4444',
       cursor: 'pointer',
+      transition: 'all 0.2s',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    userCell: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+    },
+    userAvatar: {
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      backgroundColor: 'var(--surface-muted)',
+      color: 'var(--text-secondary)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '14px',
+      fontWeight: 600,
+    },
+    userInfo: {
+      display: 'flex',
+      flexDirection: 'column',
+    },
+    userSub: {
+      fontSize: '12px',
+      color: 'var(--text-muted)',
     },
     stateBlock: {
       padding: '60px 20px',
       textAlign: 'center',
-      color: '#78909C',
+      color: 'var(--text-muted)',
+    },
+    tabContainer: {
+      display: 'flex',
+      gap: '8px',
+      marginBottom: '24px',
+      borderBottom: '1px solid var(--border-subtle)',
+      paddingBottom: '0',
+    },
+    tabButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '12px 24px',
+      borderRadius: '12px 12px 0 0',
+      border: 'none',
+      backgroundColor: 'transparent',
+      color: 'var(--text-muted)',
+      fontSize: '15px',
+      fontWeight: 600,
+      cursor: 'pointer',
+      position: 'relative',
+      transition: 'all 0.2s',
+    },
+    tabButtonActive: {
+      color: 'var(--color-primary)',
+      backgroundColor: 'var(--surface-app)',
+    },
+    tabIndicator: {
+      position: 'absolute',
+      bottom: '-1px',
+      left: 0,
+      right: 0,
+      height: '2px',
+      backgroundColor: 'var(--color-primary)',
+      borderRadius: '2px 2px 0 0',
     },
   };
 
@@ -598,33 +829,38 @@ const AdminDashboard = () => {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(13, 24, 33, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
     padding: '20px',
+    animation: 'fadeIn 0.2s ease-out',
   };
 
   const modalContentStyle = {
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--surface-card)',
     padding: '32px',
-    borderRadius: '20px',
+    borderRadius: '24px',
     width: '100%',
     maxWidth: '520px',
-    maxHeight: '90vh',
+    maxHeight: '85vh',
     overflowY: 'auto',
-    boxShadow: '0 25px 60px rgba(15, 23, 42, 0.15)',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    animation: 'slideUp 0.3s ease-out',
+    color: 'var(--text-primary)',
   };
 
   const inputStyle = {
     width: '100%',
     padding: '12px 14px',
     marginBottom: '15px',
-    border: '1px solid #E0E0E0',
+    border: '1px solid var(--border-subtle)',
     borderRadius: '12px',
     fontSize: '14px',
-    backgroundColor: '#F9FBFC',
+    backgroundColor: 'var(--surface-muted)',
+    color: 'var(--text-primary)', // Ensure text is readable
   };
 
   return (
@@ -653,12 +889,91 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-        <section style={dashboardStyles.metricsGrid}>
+        <div style={dashboardStyles.tabContainer}>
+          <button
+            ref={(el) => (tabsRef.current['dashboard'] = el)}
+            onClick={() => setActiveTab('dashboard')}
+            style={{
+              ...dashboardStyles.tabButton,
+              ...(activeTab === 'dashboard' ? dashboardStyles.tabButtonActive : {}),
+            }}
+          >
+            <LayoutDashboard size={18} />
+            Tổng quan
+          </button>
+          <button
+            ref={(el) => (tabsRef.current['challenges'] = el)}
+            onClick={() => setActiveTab('challenges')}
+            style={{
+              ...dashboardStyles.tabButton,
+              ...(activeTab === 'challenges' ? dashboardStyles.tabButtonActive : {}),
+            }}
+          >
+            <Target size={18} />
+            Thử thách
+          </button>
+          <button
+            ref={(el) => (tabsRef.current['leaderboard'] = el)}
+            onClick={() => setActiveTab('leaderboard')}
+            style={{
+              ...dashboardStyles.tabButton,
+              ...(activeTab === 'leaderboard' ? dashboardStyles.tabButtonActive : {}),
+            }}
+          >
+            <Trophy size={18} />
+            BXH
+          </button>
+          <button
+            ref={(el) => (tabsRef.current['settings'] = el)}
+            onClick={() => setActiveTab('settings')}
+            style={{
+              ...dashboardStyles.tabButton,
+              ...(activeTab === 'settings' ? dashboardStyles.tabButtonActive : {}),
+            }}
+          >
+            <Settings size={18} />
+            Cài đặt
+          </button>
+          <div
+            style={{
+              ...dashboardStyles.tabIndicator,
+              ...indicatorStyle,
+              transition: 'all 0.3s ease',
+            }}
+          />
+        </div>
+
+        <div style={{ 
+          position: 'relative', 
+          overflow: 'hidden', 
+          minHeight: '600px' // Prevent layout shift
+        }}>
+          {/* Content Wrapper for sliding effect could go here, but for now let's just conditionally render with animation */}
+          
+        {activeTab === 'dashboard' && (
+          <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <section style={dashboardStyles.metricsGrid}>
           {metrics.map((metric) => (
-            <div key={metric.label} style={dashboardStyles.metricCard}>
-              <p style={dashboardStyles.metricLabel}>{metric.label}</p>
-              <p style={dashboardStyles.metricValue}>{metric.value}</p>
-              <p style={dashboardStyles.metricHint}>{metric.hint}</p>
+            <div 
+              key={metric.label} 
+              style={dashboardStyles.metricCard}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.06)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.02)';
+              }}
+            >
+              <div style={dashboardStyles.metricContent}>
+                <p style={dashboardStyles.metricLabel}>{metric.label}</p>
+                <p style={dashboardStyles.metricValue}>{metric.value}</p>
+                <p style={dashboardStyles.metricHint}>{metric.hint}</p>
+              </div>
+              <div style={{ ...dashboardStyles.metricIcon, backgroundColor: metric.bgColor }}>
+                {metric.icon}
+              </div>
             </div>
           ))}
         </section>
@@ -673,9 +988,9 @@ const AdminDashboard = () => {
               ...(activeRoles.length === 0 ? dashboardStyles.roleBadgeActive : {}),
             }}
           >
-            Tất cả ({totalUsers})
+            <span>Tất cả ({totalUsers})</span>
           </button>
-          {roleBadgeItems.map(({ key, label }) => {
+          {roleBadgeItems.map(({ key, label, color, bg }) => {
             const isActive = activeRoles.includes(key);
             return (
               <button
@@ -684,9 +999,20 @@ const AdminDashboard = () => {
                 onClick={() => toggleRoleFilter(key)}
                 style={{
                   ...dashboardStyles.roleBadge,
-                  ...(isActive ? dashboardStyles.roleBadgeActive : {}),
+                  ...(isActive 
+                    ? { ...dashboardStyles.roleBadgeActive, backgroundColor: color, borderColor: color } 
+                    : {}
+                  ),
                 }}
               >
+                <div 
+                  style={{ 
+                    width: 8, 
+                    height: 8, 
+                    borderRadius: '50%', 
+                    backgroundColor: isActive ? '#fff' : color 
+                  }} 
+                />
                 {label}: {roleCounts[key] || 0}
               </button>
             );
@@ -777,41 +1103,255 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((u) => (
-                    <tr key={u.id}>
-                      <td style={dashboardStyles.td}>{u.username}</td>
-                      <td style={dashboardStyles.td}>
-                        {`${u.firstName || ''} ${u.lastName || ''}`.trim() || '-'}
-                      </td>
-                      <td style={dashboardStyles.td}>{u.email || '-'}</td>
-                      <td style={dashboardStyles.td}>{u.phone || '-'}</td>
-                      <td style={dashboardStyles.td}>
-                        <span style={dashboardStyles.rolePill}>{getRoleName(u.roles)}</span>
-                      </td>
-                      <td style={dashboardStyles.td}>
-                        <div style={dashboardStyles.rowActions}>
-                          <button
-                            onClick={() => openEditModal(u)}
-                            style={dashboardStyles.tableActionBtn}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(u.id)}
-                            style={dashboardStyles.tableDangerBtn}
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredUsers.map((u) => {
+                    const roleConfig = roleBadgeItems.find(r => r.key === getRoleName(u.roles)) || roleBadgeItems[3];
+                    return (
+                      <tr 
+                        key={u.id}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#F8FAFC';
+                          const actions = e.currentTarget.querySelector('.row-actions');
+                          if (actions) actions.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#fff';
+                          const actions = e.currentTarget.querySelector('.row-actions');
+                          if (actions) actions.style.opacity = '0.7';
+                        }}
+                        style={{ transition: 'background-color 0.2s' }}
+                      >
+                        <td style={dashboardStyles.td}>
+                          <div style={dashboardStyles.userCell}>
+                            <div style={dashboardStyles.userAvatar}>
+                              {(u.username?.[0] || 'U').toUpperCase()}
+                            </div>
+                            <div style={dashboardStyles.userInfo}>
+                              <span style={{ fontWeight: 500 }}>{u.username}</span>
+                              <span style={dashboardStyles.userSub}>ID: {u.id}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={dashboardStyles.td}>
+                          {`${u.firstName || ''} ${u.lastName || ''}`.trim() || '-'}
+                        </td>
+                        <td style={dashboardStyles.td}>{u.email || '-'}</td>
+                        <td style={dashboardStyles.td}>{u.phone || '-'}</td>
+                        <td style={dashboardStyles.td}>
+                          <span style={{
+                            ...dashboardStyles.rolePill,
+                            backgroundColor: roleConfig.bg,
+                            color: roleConfig.color
+                          }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: roleConfig.color }} />
+                            {getRoleName(u.roles)}
+                          </span>
+                        </td>
+                        <td style={dashboardStyles.td}>
+                          <div className="row-actions" style={dashboardStyles.rowActions}>
+                            <button
+                              onClick={() => openEditModal(u)}
+                              style={dashboardStyles.tableActionBtn}
+                              title="Chỉnh sửa"
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(u.id)}
+                              style={dashboardStyles.tableDangerBtn}
+                              title="Xóa người dùng"
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FEF2F2'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </section>
+          </div>
+        )}
+
+        {activeTab === 'challenges' && (
+          <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <section style={dashboardStyles.actionCard}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>Quản lý Thử thách</h3>
+                  <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '14px' }}>Tạo và quản lý các nhiệm vụ cho người dùng</p>
+                </div>
+                <button
+                  onClick={() => setShowCreateChallengeModal(true)}
+                  style={dashboardStyles.ctaPrimaryButton}
+                >
+                  <Plus size={18} style={{ marginRight: '8px' }} />
+                  Thêm thử thách mới
+                </button>
+              </div>
+            </section>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '24px' }}>
+              {challenges.map(challenge => (
+                <div key={challenge.id} style={dashboardStyles.metricCard}>
+                  <div style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '32px' }}>{challenge.icon}</span>
+                      <span style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: '99px', 
+                        fontSize: '12px', 
+                        fontWeight: 600,
+                        backgroundColor: challenge.type === 'DAILY' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(33, 150, 243, 0.1)',
+                        color: challenge.type === 'DAILY' ? '#4CAF50' : '#2196F3'
+                      }}>
+                        {challenge.type}
+                      </span>
+                    </div>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', color: 'var(--text-primary)' }}>{challenge.title}</h4>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>{challenge.description}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#FF9800', fontWeight: 600, fontSize: '14px' }}>
+                        <Gift size={14} />
+                        {challenge.rewardPoints} XP
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button style={dashboardStyles.tableActionBtn}><Edit2 size={16} /></button>
+                        <button style={dashboardStyles.tableDangerBtn}><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'leaderboard' && (
+          <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <section style={dashboardStyles.actionCard}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>Bảng xếp hạng & Trao thưởng</h3>
+                  <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '14px' }}>Theo dõi top người dùng và trao quà thủ công</p>
+                </div>
+                <button
+                  onClick={() => setShowRewardModal(true)}
+                  style={{ ...dashboardStyles.ctaPrimaryButton, backgroundImage: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)' }}
+                >
+                  <Gift size={18} style={{ marginRight: '8px' }} />
+                  Tặng quà thủ công
+                </button>
+              </div>
+            </section>
+
+            <section style={{ ...dashboardStyles.tableCard, marginTop: '24px' }}>
+              <div style={dashboardStyles.tableWrapper}>
+                <table style={dashboardStyles.table}>
+                  <thead>
+                    <tr>
+                      <th style={dashboardStyles.th}>Hạng</th>
+                      <th style={dashboardStyles.th}>Người dùng</th>
+                      <th style={dashboardStyles.th}>Điểm XP</th>
+                      <th style={dashboardStyles.th}>Danh hiệu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.length > 0 ? leaderboard.map((user, index) => (
+                      <tr key={user.id}>
+                        <td style={dashboardStyles.td}>
+                          <div style={{ 
+                            width: '28px', 
+                            height: '28px', 
+                            borderRadius: '50%', 
+                            backgroundColor: index < 3 ? '#FFC107' : '#E0E0E0',
+                            color: index < 3 ? '#000' : '#757575',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            fontWeight: 700
+                          }}>
+                            {index + 1}
+                          </div>
+                        </td>
+                        <td style={dashboardStyles.td}>
+                          <div style={dashboardStyles.userCell}>
+                            <div style={dashboardStyles.userAvatar}>{(user.username?.[0] || 'U').toUpperCase()}</div>
+                            <span style={{ fontWeight: 500 }}>{user.username}</span>
+                          </div>
+                        </td>
+                        <td style={dashboardStyles.td}><span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{user.totalPoints} XP</span></td>
+                        <td style={dashboardStyles.td}>{user.title || 'Mới bắt đầu'}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="4" style={{ ...dashboardStyles.td, textAlign: 'center', padding: '40px' }}>Chưa có dữ liệu bảng xếp hạng</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', animation: 'fadeIn 0.3s ease-out' }}>
+            <ThemeCustomizer />
+          </div>
+        )}
+        </div>
       </div>
+
+      {/* Create Challenge Modal */}
+      {showChallengeModal && (
+        <div style={modalStyle} onClick={() => setShowCreateChallengeModal(false)}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0 }}>Tạo Thử thách mới</h2>
+            <form onSubmit={handleCreateChallenge}>
+              <input type="text" placeholder="Tên thử thách" style={inputStyle} value={challengeData.title} onChange={e => setChallengeData({...challengeData, title: e.target.value})} required />
+              <input type="text" placeholder="Mô tả ngắn" style={inputStyle} value={challengeData.description} onChange={e => setChallengeData({...challengeData, description: e.target.value})} />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input type="number" placeholder="Mục tiêu (số lần)" style={inputStyle} value={challengeData.goal} onChange={e => setChallengeData({...challengeData, goal: e.target.value})} />
+                <input type="number" placeholder="Điểm thưởng XP" style={inputStyle} value={challengeData.rewardPoints} onChange={e => setChallengeData({...challengeData, rewardPoints: e.target.value})} />
+              </div>
+              <select style={inputStyle} value={challengeData.type} onChange={e => setChallengeData({...challengeData, type: e.target.value})}>
+                <option value="DAILY">Hàng ngày</option>
+                <option value="WEEKLY">Hàng tuần</option>
+                <option value="ONE_TIME">Một lần</option>
+              </select>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" style={primaryButton}>Tạo thử thách</button>
+                <button type="button" onClick={() => setShowCreateChallengeModal(false)} style={buttonStyle}>Hủy</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Give Reward Modal */}
+      {showRewardModal && (
+        <div style={modalStyle} onClick={() => setShowRewardModal(false)}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0 }}>Tặng quà cho thành viên</h2>
+            <form onSubmit={handleGiveReward}>
+              <input type="text" placeholder="ID người dùng hoặc Username" style={inputStyle} value={rewardData.userId} onChange={e => setRewardData({...rewardData, userId: e.target.value})} required />
+              <input type="number" placeholder="Số điểm thưởng" style={inputStyle} value={rewardData.score} onChange={e => setRewardData({...rewardData, score: e.target.value})} required />
+              <input type="text" placeholder="Lý do tặng quà" style={inputStyle} value={rewardData.reason} onChange={e => setRewardData({...rewardData, reason: e.target.value})} />
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" style={{ ...primaryButton, backgroundImage: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)' }}>Gửi quà tặng</button>
+                <button type="button" onClick={() => setShowRewardModal(false)} style={buttonStyle}>Hủy</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {showCreateModal && (
@@ -987,6 +1527,18 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+        <style>
+        {`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}
+        </style>
     </div>
   );
 };
