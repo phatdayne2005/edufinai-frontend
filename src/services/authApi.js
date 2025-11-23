@@ -13,6 +13,42 @@ const getToken = () => {
 };
 
 /**
+ * Refresh Token - Gia hạn token
+ * API: POST http://localhost:8080/auth/auth/refresh
+ * Request: { token: string }
+ */
+export const refreshToken = async () => {
+    const currentToken = getToken();
+    if (!currentToken) return null;
+
+    try {
+        const response = await fetch(`${AUTH_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: currentToken }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.code === 1000) {
+            const newToken = data.result.token;
+            setToken(newToken);
+            return newToken;
+        } else {
+            console.error('Refresh token failed:', data);
+            removeToken();
+            return null;
+        }
+    } catch (error) {
+        console.error('Error refreshing token:', error);
+        removeToken();
+        return null;
+    }
+};
+
+/**
  * Handle API response and extract result or throw error
  */
 const handleResponse = async (response) => {
@@ -143,6 +179,30 @@ const apiRequest = async (endpoint, options = {}, requireAuth = false) => {
         ok: response.ok,
         headers: Object.fromEntries(response.headers.entries()),
     });
+
+    // Handle 401 Unauthorized - Attempt to refresh token
+    if (response.status === 401 && requireAuth && !options._retry) {
+        console.log('Token expired (401), attempting to refresh...');
+        const newToken = await refreshToken();
+
+        if (newToken) {
+            console.log('Token refreshed successfully, retrying request...');
+            // Retry request with new token
+            const newOptions = {
+                ...options,
+                _retry: true,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${newToken}`,
+                },
+            };
+            return apiRequest(endpoint, newOptions, requireAuth);
+        } else {
+            console.log('Token refresh failed, redirecting to login...');
+            // Refresh failed, let the error propagate or handle logout
+            // The handleResponse below will throw the 401 error
+        }
+    }
 
     return handleResponse(response);
 };
