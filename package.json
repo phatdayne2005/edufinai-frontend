@@ -9,6 +9,7 @@
     "@testing-library/user-event": "^13.5.0",
     "firebase": "^12.6.0",
     "lucide-react": "^0.553.0",
+    "pdfjs-dist": "^3.11.174",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5",
@@ -49,5 +50,9 @@
     "postcss": "^8.4.38",
     "resolve-url-loader": "^5.0.0",
     "webpack-dev-server": "^4.15.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.22",
+    "tailwindcss": "^3.4.1"
   }
 }

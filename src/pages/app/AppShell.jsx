@@ -36,6 +36,11 @@ const AppShell = () => {
     if (nextIndex === -1) return;
     setTransitionDirection(nextIndex > currentIndex ? 'forward' : 'backward');
     setActiveTab(nextTab);
+    
+    // Scroll to top when changing tabs
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, [activeTab, tabOrder]);
 
   // Handle navigation state to set active tab

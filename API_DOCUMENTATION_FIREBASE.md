@@ -1,4 +1,4 @@
-## Firebase Notification Service API
+n## Firebase Notification Service API
 
 Base URL: `/api/notifications` (đi qua Gateway hoặc base URL nội bộ tùy môi trường).  
 Tất cả endpoint yêu cầu người dùng đã đăng nhập; frontend cần gửi kèm JWT token trong header `Authorization: Bearer <token>`.

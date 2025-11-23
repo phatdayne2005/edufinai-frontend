@@ -4,7 +4,14 @@ import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
-import { getLeaderboard, getMyLeaderboardPosition, getMe } from '../../services/gamificationApi';
+import { 
+  getLeaderboard, 
+  getMyLeaderboardPosition, 
+  getMe,
+  getChallenges,
+  getActiveChallenges,
+  getCompletedChallenges
+} from '../../services/gamificationApi';
 
 const LEADERBOARD_TYPES = [
   { value: 'DAILY', label: '📅 Hàng ngày' },
@@ -14,7 +21,7 @@ const LEADERBOARD_TYPES = [
 ];
 
 const ChallengesPage = () => {
-  const { challenges, user: mockUser } = useApp();
+  const { user: mockUser } = useApp();
   const { user: authUser, getToken } = useAuth();
   const [leaderboard, setLeaderboard] = useState([]);
   const [myPosition, setMyPosition] = useState(null);
@@ -23,6 +30,9 @@ const ChallengesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeChallenges, setActiveChallenges] = useState([]);
+  const [completedChallenges, setCompletedChallenges] = useState([]);
+  const [challengesLoading, setChallengesLoading] = useState(true);
 
   // Get current user ID from JWT token
   useEffect(() => {
@@ -72,17 +82,25 @@ const ChallengesPage = () => {
       ]);
 
       // Map API response to UI format
-      const mappedLeaderboard = leaderboardData.map((item) => ({
-        rank: item.top,
-        userId: item.userId,
-        points: Math.round(item.score),
-        name: `User ${item.userId.substring(0, 8)}`, // Fallback name
+      // API returns: { result: [{ name, score, top }], status }
+      // Note: name field is usually empty string, we'll use a fallback
+      const mappedLeaderboard = (leaderboardData || []).map((item, index) => ({
+        rank: item.top || (index + 1),
+        userId: `user-${item.top || (index + 1)}`, // Generate fallback ID
+        points: Math.round(item.score || 0),
+        name: item.name || `Người chơi #${item.top || (index + 1)}`, // Use name or fallback
         avatar: '👤',
-        isMe: currentUserId && item.userId === currentUserId,
+        isMe: false, // We'll check this separately using myPosition
       }));
 
       setLeaderboard(mappedLeaderboard);
-      setMyPosition(myPositionData);
+      
+      // Handle myPosition response structure: { code, result: { name, score, top }, message }
+      if (myPositionData && myPositionData.result) {
+        setMyPosition(myPositionData.result);
+      } else {
+        setMyPosition(null);
+      }
     } catch (err) {
       console.error('Error fetching leaderboard:', err);
       setError(err.message || 'Không thể tải bảng xếp hạng');
@@ -93,9 +111,31 @@ const ChallengesPage = () => {
     }
   };
 
+  // Fetch challenges
+  const fetchChallenges = async () => {
+    try {
+      setChallengesLoading(true);
+      const [activeData, completedData] = await Promise.all([
+        getActiveChallenges().catch(() => ({ code: 200, result: [], message: '' })),
+        getCompletedChallenges().catch(() => ({ code: 200, result: [], message: '' })),
+      ]);
+
+      // Handle response structure: { code, result[], message }
+      setActiveChallenges(activeData?.result || []);
+      setCompletedChallenges(completedData?.result || []);
+    } catch (err) {
+      console.error('Error fetching challenges:', err);
+      setActiveChallenges([]);
+      setCompletedChallenges([]);
+    } finally {
+      setChallengesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (currentUserId !== undefined) {
       fetchLeaderboard(selectedType);
+      fetchChallenges();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType, currentUserId]);
@@ -105,13 +145,14 @@ const ChallengesPage = () => {
   };
 
   // Get user stats from my position or fallback to mock data
+  // myPosition structure: { name, score, top }
   const userStats = myPosition
     ? {
       points: Math.round(myPosition.score || 0),
       rank: myPosition.top > 0 ? myPosition.top : 'N/A',
       level: Math.floor((myPosition.score || 0) / 1000) + 1,
     }
-    : mockUser;
+    : mockUser || { points: 0, rank: 'N/A', level: 1 };
 
   return (
     <div style={styles.page}>
@@ -144,31 +185,101 @@ const ChallengesPage = () => {
       </div>
 
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Thử thách hiện tại</h3>
-        {challenges.map((challenge) => (
-          <div key={challenge.id} style={styles.challengeCard}>
-            <div style={styles.challengeHeader}>
-              <h4 style={styles.challengeTitle}>{challenge.title}</h4>
-              <span style={styles.challengeReward}>🎁 {challenge.reward} điểm</span>
-            </div>
-            <div style={styles.challengeProgress}>
-              <div style={styles.progressBar}>
-                <div
-                  style={{
-                    ...styles.progressFill,
-                    width: `${(challenge.progress / challenge.target) * 100}%`,
-                  }}
-                />
-              </div>
-              <span style={styles.challengeText}>
-                {challenge.progress}/{challenge.target}
-              </span>
-            </div>
-            <span style={styles.challengeType}>
-              {challenge.type === 'daily' ? '📅 Hàng ngày' : '📆 Hàng tuần'}
-            </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={styles.sectionTitle}>Thử thách đang thực hiện</h3>
+          {challengesLoading && (
+            <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+          )}
+        </div>
+        
+        {challengesLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: '8px' }} />
+            <p>Đang tải thử thách...</p>
           </div>
-        ))}
+        ) : activeChallenges.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            <p>Chưa có thử thách đang thực hiện</p>
+          </div>
+        ) : (
+          activeChallenges.map((challenge) => {
+            const progressPercent = challenge.targetProgress > 0 
+              ? (challenge.currentProgress / challenge.targetProgress) * 100 
+              : 0;
+            return (
+              <div key={challenge.challengeId} style={styles.challengeCard}>
+                <div style={styles.challengeHeader}>
+                  <h4 style={styles.challengeTitle}>{challenge.title}</h4>
+                  <span style={styles.challengeReward}>
+                    🎁 {challenge.rewardScore || 0} điểm
+                  </span>
+                </div>
+                <div style={styles.challengeProgress}>
+                  <div style={styles.progressBar}>
+                    <div
+                      style={{
+                        ...styles.progressFill,
+                        width: `${Math.min(progressPercent, 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <span style={styles.challengeText}>
+                    {challenge.currentProgress}/{challenge.targetProgress}
+                  </span>
+                </div>
+                <span style={styles.challengeType}>
+                  {challenge.scope === 'DAILY' ? '📅 Hàng ngày' : 
+                   challenge.scope === 'WEEKLY' ? '📆 Hàng tuần' :
+                   challenge.scope === 'MONTHLY' ? '📊 Hàng tháng' : '🎯 Một lần'}
+                </span>
+              </div>
+            );
+          })
+        )}
+
+        {completedChallenges.length > 0 && (
+          <>
+            <h3 style={{ ...styles.sectionTitle, marginTop: '24px', marginBottom: '16px' }}>
+              Thử thách đã hoàn thành
+            </h3>
+            {completedChallenges.map((challenge) => {
+              const completedDate = challenge.completedAt 
+                ? new Date(challenge.completedAt).toLocaleDateString('vi-VN')
+                : '';
+              return (
+                <div key={challenge.challengeId} style={{ ...styles.challengeCard, opacity: 0.8 }}>
+                  <div style={styles.challengeHeader}>
+                    <h4 style={styles.challengeTitle}>
+                      ✅ {challenge.title}
+                    </h4>
+                    <span style={styles.challengeReward}>
+                      🎁 {challenge.rewardScore || 0} điểm
+                    </span>
+                  </div>
+                  <div style={styles.challengeProgress}>
+                    <div style={styles.progressBar}>
+                      <div
+                        style={{
+                          ...styles.progressFill,
+                          width: '100%',
+                          backgroundColor: '#4CAF50',
+                        }}
+                      />
+                    </div>
+                    <span style={styles.challengeText}>
+                      {challenge.currentProgress}/{challenge.targetProgress} ✓
+                    </span>
+                  </div>
+                  {completedDate && (
+                    <span style={{ ...styles.challengeType, color: '#4CAF50' }}>
+                      Hoàn thành: {completedDate}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
 
       <div style={styles.section}>
@@ -179,7 +290,7 @@ const ChallengesPage = () => {
             disabled={refreshing}
             style={{
               padding: '8px 12px',
-              backgroundColor: '#007bff',
+              backgroundImage: 'var(--gradient-brand)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -204,8 +315,9 @@ const ChallengesPage = () => {
               onClick={() => setSelectedType(type.value)}
               style={{
                 padding: '8px 16px',
-                backgroundColor: selectedType === type.value ? '#007bff' : '#f0f0f0',
-                color: selectedType === type.value ? 'white' : '#333',
+                backgroundColor: selectedType === type.value ? 'transparent' : 'var(--surface-muted)',
+                backgroundImage: selectedType === type.value ? 'var(--gradient-brand)' : 'none',
+                color: selectedType === type.value ? 'white' : 'var(--text-primary)',
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -297,7 +409,31 @@ const ChallengesPage = () => {
                   <span style={styles.leaderboardName}>Bạn</span>
                 </div>
                 <span style={styles.leaderboardPoints}>
-                  {Math.round(myPosition.score).toLocaleString()} điểm
+                  {Math.round(myPosition.score || 0).toLocaleString()} điểm
+                </span>
+              </div>
+            )}
+            
+            {/* Show my position if not ranked (top = -1) */}
+            {myPosition && myPosition.top === -1 && (
+              <div
+                style={{
+                  ...styles.leaderboardItem,
+                  ...styles.leaderboardItemMe,
+                  marginTop: '12px',
+                  borderTop: '2px dashed #ccc',
+                  paddingTop: '12px',
+                }}
+              >
+                <div style={styles.leaderboardLeft}>
+                  <span style={{ ...styles.leaderboardRank, color: '#666' }}>
+                    N/A
+                  </span>
+                  <span style={styles.leaderboardAvatar}>👤</span>
+                  <span style={styles.leaderboardName}>Bạn</span>
+                </div>
+                <span style={styles.leaderboardPoints}>
+                  {Math.round(myPosition.score || 0).toLocaleString()} điểm
                 </span>
               </div>
             )}

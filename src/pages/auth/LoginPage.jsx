@@ -214,6 +214,11 @@ const LoginPage = () => {
               style={styles.authInput}
               required
             />
+            <div style={{ textAlign: 'right', marginTop: '8px' }}>
+              <Link to="/auth/forgot-password" style={{ ...styles.authLink, fontSize: '13px' }}>
+                Quên mật khẩu?
+              </Link>
+            </div>
           </div>
 
           <button type="submit" style={styles.authButton} disabled={loading}>

@@ -255,13 +255,13 @@ const ChatBotPage = () => {
                     key={conversation.conversationId}
                     style={{
                       borderRadius: 12,
-                      border: conversation.conversationId === conversationId ? '2px solid #4CAF50' : '1px solid var(--border-subtle)',
+                      border: conversation.conversationId === conversationId ? '2px solid var(--color-primary)' : '1px solid var(--border-subtle)',
                       padding: '12px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 6,
                       cursor: 'pointer',
-                      backgroundColor: conversation.conversationId === conversationId ? 'rgba(76, 175, 80, 0.08)' : 'transparent',
+                      backgroundColor: conversation.conversationId === conversationId ? 'var(--surface-muted)' : 'transparent',
                     }}
                     onClick={() => handleSelectConversation(conversation.conversationId)}
                   >
@@ -304,7 +304,7 @@ const ChatBotPage = () => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <MessageSquare size={20} color="#4CAF50" />
+            <MessageSquare size={20} color="var(--color-primary)" />
             <h3 style={{ ...styles.sectionTitle, margin: 0 }}>Cuộc trò chuyện</h3>
             {isLoadingHistory && (
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#666' }} />
@@ -352,7 +352,8 @@ const ChatBotPage = () => {
                   key={message.id}
                   style={{
                     alignSelf: isUser ? 'flex-end' : 'flex-start',
-                    backgroundColor: isUser ? '#4CAF50' : 'var(--surface-card)',
+                    backgroundColor: isUser ? 'var(--color-primary)' : 'var(--surface-card)',
+                    backgroundImage: isUser ? 'var(--gradient-brand)' : 'none',
                     color: isUser ? '#fff' : 'var(--text-primary)',
                     padding: '12px 16px',
                     borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
@@ -401,7 +402,7 @@ const ChatBotPage = () => {
               style={{
                 borderRadius: 12,
                 border: 'none',
-                backgroundColor: '#4CAF50',
+                backgroundImage: 'var(--gradient-brand)',
                 color: '#fff',
                 padding: '0 18px',
                 display: 'flex',
