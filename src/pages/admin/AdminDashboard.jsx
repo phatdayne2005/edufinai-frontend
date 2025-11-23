@@ -1452,7 +1452,7 @@ const AdminDashboard = () => {
                 placeholder="Username"
                 value={formData.username}
                 disabled
-                style={{ ...inputStyle, backgroundColor: '#f5f5f5' }}
+                style={{ ...inputStyle, opacity: 0.7, cursor: 'not-allowed' }}
               />
               <input
                 type="password"
