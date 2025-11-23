@@ -5,16 +5,65 @@ import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { getDailyReport } from '../../services/aiService';
+import { getBalance, getMonthlySummary, getRecentTransactions, getGoals } from '../../services/financeApi';
+import TransactionModal from '../../components/finance/TransactionModal';
+import GoalModal from '../../components/finance/GoalModal';
+import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { user: mockUser, goals, expenses } = useApp();
   const { user: authUser } = useAuth();
-  const activeGoals = goals.filter((goal) => goal.status === 'ACTIVE');
-  const recentExpenses = expenses.slice(0, 3);
+  const navigate = useNavigate();
+  
+  // Finance data states
+  const [balance, setBalance] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Modal states
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [transactionType, setTransactionType] = useState('INCOME');
+  
+  // AI Report states
   const [dailyReport, setDailyReport] = useState(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [reportError, setReportError] = useState(null);
+  
+  const activeGoals = goals.filter((goal) => goal.status === 'ACTIVE');
+
+  // Load finance data
+  const loadFinanceData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [balanceData, summaryData, transactionsData, goalsData] = await Promise.all([
+        getBalance().catch(() => null),
+        getMonthlySummary().catch(() => null),
+        getRecentTransactions(3).catch(() => []),
+        getGoals().catch(() => []),
+      ]);
+      
+      setBalance(balanceData);
+      setSummary(summaryData);
+      setRecentTransactions(transactionsData || []);
+      setGoals(goalsData || []);
+    } catch (err) {
+      console.error('Error loading finance data:', err);
+      setError(err.message || 'Không thể tải dữ liệu tài chính');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFinanceData();
+  }, [loadFinanceData]);
 
   const loadDailyReport = useCallback(async () => {
     setIsLoadingReport(true);
@@ -113,6 +162,10 @@ const HomePage = () => {
           <div className="grid grid-cols-2 gap-4">
             <button 
               type="button" 
+              onClick={() => {
+                setTransactionType('INCOME');
+                setShowTransactionModal(true);
+              }}
               className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 text-left"
             >
               <div className="p-2 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
@@ -122,6 +175,7 @@ const HomePage = () => {
             </button>
             <button 
               type="button" 
+              onClick={() => setShowGoalModal(true)}
               className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 text-left"
             >
               <div className="p-2 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
@@ -139,25 +193,47 @@ const HomePage = () => {
                 <ChevronRight size={20} />
               </button>
             </div>
-            {activeGoals.map((goal) => (
-              <div 
-                key={goal.id} 
-                className="group bg-card p-4 rounded-xl border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 cursor-pointer relative overflow-hidden"
-              >
-                <div className="flex justify-between mb-2 relative z-10">
-                  <span className="text-sm font-semibold text-text-primary group-hover:text-primary transition-colors">{goal.title}</span>
-                  <span className="text-sm font-bold text-primary">
-                    {(goal.current / 1000000).toFixed(1)}M / {(goal.target / 1000000).toFixed(1)}M
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden relative z-10">
-                  <div
-                    className="h-full bg-gradient-to-r from-primary to-primary-soft rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${(goal.current / goal.target) * 100}%` }}
-                  />
-                </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={24} className="animate-spin text-primary" />
               </div>
-            ))}
+            ) : activeGoals.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-8">Chưa có mục tiêu nào</p>
+            ) : (
+              activeGoals.map((goal) => {
+                const progress = goal.amount > 0 ? (goal.savedAmount / goal.amount) * 100 : 0;
+                return (
+                  <div 
+                    key={goal.goalId} 
+                    onClick={() => {
+                      navigate('/', { 
+                        state: { 
+                          activeTab: 'finance',
+                          goalId: goal.goalId 
+                        } 
+                      });
+                    }}
+                    className="group bg-card p-4 rounded-xl border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 cursor-pointer relative overflow-hidden"
+                  >
+                    <div className="flex justify-between mb-2 relative z-10">
+                      <span className="text-sm font-semibold text-text-primary group-hover:text-primary transition-colors">{goal.title}</span>
+                      <span className="text-sm font-bold text-primary">
+                        {formatCurrency(goal.savedAmount)} / {formatCurrency(goal.amount)}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden relative z-10">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-primary-soft rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${Math.min(progress, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-text-muted mt-2">
+                      {Math.round(progress)}% hoàn thành
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -170,30 +246,43 @@ const HomePage = () => {
                 <ChevronRight size={20} />
               </button>
             </div>
-            <div className="flex flex-col gap-3">
-              {recentExpenses.map((exp) => (
-                <div 
-                  key={exp.id} 
-                  className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border hover:bg-muted/50 hover:border-primary/20 transition-all duration-200 cursor-pointer"
-                >
-                  <div className="text-2xl p-2 bg-muted rounded-full shrink-0">
-                    {exp.type === 'EXPENSE' ? '💸' : '💰'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary truncate">{exp.category}</p>
-                    <p className="text-xs text-text-muted">{exp.date}</p>
-                  </div>
-                  <p
-                    className={`text-base font-bold whitespace-nowrap ${
-                      exp.type === 'EXPENSE' ? 'text-danger' : 'text-success'
-                    }`}
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={24} className="animate-spin text-primary" />
+              </div>
+            ) : recentTransactions.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-8">Chưa có giao dịch nào</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {recentTransactions.map((transaction) => (
+                  <div 
+                    key={transaction.transactionId} 
+                    className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border hover:bg-muted/50 hover:border-primary/20 transition-all duration-200 cursor-pointer"
                   >
-                    {exp.type === 'EXPENSE' ? '-' : '+'}
-                    {exp.amount.toLocaleString('vi-VN')}đ
-                  </p>
-                </div>
-              ))}
-            </div>
+                    <div className="text-2xl p-2 bg-muted rounded-full shrink-0">
+                      {transaction.type === 'EXPENSE' ? '💸' : transaction.type === 'WITHDRAWAL' ? '💳' : '💰'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text-primary truncate">{transaction.name}</p>
+                      <p className="text-xs text-text-muted">{transaction.category}</p>
+                      <p className="text-xs text-text-muted">{formatDateTime(transaction.transactionDate)}</p>
+                    </div>
+                    <p
+                      className={`text-base font-bold whitespace-nowrap ${
+                        // INCOME có goalId (nạp vào mục tiêu) hoặc EXPENSE: hiển thị số âm (màu đỏ)
+                        // WITHDRAWAL (rút từ mục tiêu) hoặc INCOME không có goalId: hiển thị số dương (màu xanh)
+                        transaction.type === 'EXPENSE' || (transaction.type === 'INCOME' && transaction.goalId)
+                          ? 'text-danger'
+                          : 'text-success'
+                      }`}
+                    >
+                      {transaction.type === 'EXPENSE' || (transaction.type === 'INCOME' && transaction.goalId) ? '-' : '+'}
+                      {formatCurrency(transaction.amount)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* AI Report Card */}
@@ -276,6 +365,19 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <TransactionModal
+        isOpen={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        onSuccess={handleTransactionSuccess}
+        type={transactionType}
+      />
+      <GoalModal
+        isOpen={showGoalModal}
+        onClose={() => setShowGoalModal(false)}
+        onSuccess={handleGoalSuccess}
+      />
     </div>
   );
 };

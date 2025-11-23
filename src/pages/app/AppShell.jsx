@@ -7,6 +7,7 @@ import LearningPage from '../learning/LearningPage';
 import ChallengesPage from '../challenges/ChallengesPage';
 import ProfilePage from '../profile/ProfilePage';
 import ChatBotPage from '../chat/ChatBotPage';
+import BalanceGuard from '../../components/finance/BalanceGuard';
 import { styles } from '../../styles/appStyles';
 import { tabs, defaultTab } from '../../constants/navigation';
 import { listenForegroundNotifications } from '../../firebase/firebaseMessaging';
@@ -46,11 +47,13 @@ const AppShell = () => {
   // Handle navigation state to set active tab
   useEffect(() => {
     const requestedTab = location.state?.activeTab;
+    const goalId = location.state?.goalId;
     if (requestedTab && requestedTab !== activeTab) {
       handleTabChange(requestedTab);
-      navigate(location.pathname, { replace: true, state: {} });
+      // Keep goalId in state if it exists (for FinancePage to scroll to goal)
+      navigate(location.pathname, { replace: true, state: goalId ? { goalId } : {} });
     }
-  }, [location.state?.activeTab, handleTabChange, activeTab, navigate, location.pathname]);
+  }, [location.state?.activeTab, location.state?.goalId, handleTabChange, activeTab, navigate, location.pathname]);
 
   // Listen to foreground FCM notifications for debugging
   useEffect(() => {
@@ -93,15 +96,27 @@ const AppShell = () => {
     setIncomingNotification(null);
   };
 
+  // Finance-related tabs that require balance initialization
+  const financeTabs = ['home', 'finance'];
+  const requiresBalanceCheck = financeTabs.includes(activeTab);
+
+  const pageContent = (
+    <div
+      key={activeTab}
+      className={`tab-transition tab-transition--${transitionDirection}`}
+    >
+      <ActivePage />
+    </div>
+  );
+
   return (
     <div style={styles.app} className="app-shell">
       <main style={styles.main} className="app-shell__main">
-        <div
-          key={activeTab}
-          className={`tab-transition tab-transition--${transitionDirection}`}
-        >
-          <ActivePage />
-        </div>
+        {requiresBalanceCheck ? (
+          <BalanceGuard>{pageContent}</BalanceGuard>
+        ) : (
+          pageContent
+        )}
       </main>
       <BottomNav
         activeTab={activeTab}
