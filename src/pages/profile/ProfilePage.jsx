@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Brain, ChevronRight, Loader2, RefreshCw, AlertCircle, Award, Trophy } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
 import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
 import { askQuestion } from '../../services/aiService';
+import { getMyBadges, getUserRewards } from '../../services/gamificationApi';
 
 const menuItems = [
   { icon: '🔔', label: 'Thông báo' },
@@ -50,6 +51,10 @@ const ProfilePage = () => {
       disclaimers: [],
     }))
   );
+  const [badges, setBadges] = useState([]);
+  const [rewards, setRewards] = useState(null);
+  const [badgesLoading, setBadgesLoading] = useState(true);
+  const [rewardsLoading, setRewardsLoading] = useState(true);
 
   const handleLogout = async () => {
     try {
@@ -107,8 +112,35 @@ const ProfilePage = () => {
     }
   };
 
+  // Fetch badges and rewards
+  const fetchGamificationData = async () => {
+    try {
+      setBadgesLoading(true);
+      setRewardsLoading(true);
+
+      const [badgesData, rewardsData] = await Promise.all([
+        getMyBadges().catch(() => ({ code: 200, result: [], message: '' })),
+        getUserRewards().catch(() => null),
+      ]);
+
+      // Handle badges response: { code, result[], message }
+      setBadges(badgesData?.result || []);
+
+      // Handle rewards response: { userId, totalScore, rewardDetail[] }
+      setRewards(rewardsData);
+    } catch (err) {
+      console.error('Error fetching gamification data:', err);
+      setBadges([]);
+      setRewards(null);
+    } finally {
+      setBadgesLoading(false);
+      setRewardsLoading(false);
+    }
+  };
+
   useEffect(() => {
     widgetConfigs.forEach((config) => fetchWidget(config.key));
+    fetchGamificationData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,6 +164,22 @@ const ProfilePage = () => {
           {displayUser.username && displayUser.email && ' • '}
           {displayUser.username && <span>@{displayUser.username}</span>}
         </p>
+        {rewards && (
+          <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Trophy size={18} color="#FFD700" />
+              <span style={{ fontSize: '14px', fontWeight: 600 }}>
+                {Math.round(rewards.totalScore || 0).toLocaleString()} điểm
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Award size={18} color="#2196F3" />
+              <span style={{ fontSize: '14px', fontWeight: 600 }}>
+                {badges.length} badge{badges.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Nút xem thông tin cá nhân */}
@@ -149,6 +197,128 @@ const ProfilePage = () => {
           <ChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
         </button>
       </div>
+
+      {/* Badges Section */}
+      <div style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <Award size={24} color="#2196F3" />
+          <h3 style={styles.sectionTitle}>Badges đạt được</h3>
+        </div>
+        {badgesLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#666', padding: '12px' }}>
+            <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            <span>Đang tải badges...</span>
+          </div>
+        ) : badges.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            <p>Chưa có badge nào. Hãy hoàn thành các thử thách để nhận badge!</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
+            {badges.map((badge) => (
+              <div
+                key={badge.badgeCode}
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--card-bg)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                {badge.iconUrl ? (
+                  <img 
+                    src={badge.iconUrl} 
+                    alt={badge.badgeName}
+                    style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'block';
+                    }}
+                  />
+                ) : null}
+                <div style={{ fontSize: '32px', display: badge.iconUrl ? 'none' : 'block' }}>
+                  🏆
+                </div>
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>
+                    {badge.badgeName || badge.badgeCode}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0 0' }}>
+                    {badge.badgeDescription || ''}
+                  </p>
+                  {badge.count > 1 && (
+                    <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
+                      Đạt được {badge.count} lần
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Rewards Section */}
+      {rewards && rewards.rewardDetail && rewards.rewardDetail.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <Trophy size={24} color="#FFD700" />
+            <h3 style={styles.sectionTitle}>Lịch sử phần thưởng</h3>
+          </div>
+          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            {rewards.rewardDetail.slice(0, 10).map((reward) => (
+              <div
+                key={reward.rewardId}
+                style={{
+                  padding: '12px',
+                  marginBottom: '8px',
+                  backgroundColor: 'var(--card-bg)',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>
+                    {reward.badge ? `🏆 ${reward.badge}` : `💰 +${reward.score} điểm`}
+                  </p>
+                  {reward.reason && (
+                    <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0 0' }}>
+                      {reward.reason}
+                    </p>
+                  )}
+                  {reward.createdAt && (
+                    <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
+                      {new Date(reward.createdAt).toLocaleDateString('vi-VN', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: '#4CAF50' }}>
+                  +{reward.score} điểm
+                </div>
+              </div>
+            ))}
+            {rewards.rewardDetail.length > 10 && (
+              <p style={{ textAlign: 'center', fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                Và {rewards.rewardDetail.length - 10} phần thưởng khác...
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={styles.section}>
         <div style={styles.sectionHeader}>
@@ -242,6 +412,15 @@ const ProfilePage = () => {
           <ChevronRight size={20} style={{ color: '#fff' }} />
         </button>
       </div>
+
+      <style>
+        {`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </div>
   );
 };

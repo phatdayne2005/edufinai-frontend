@@ -11,23 +11,52 @@ firebase.initializeApp(self.__FIREBASE_CONFIG || {});
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
-    const notificationTitle = payload.notification?.title || payload.data?.title || 'EduFinAI';
-    const notificationBody = payload.notification?.body || payload.data?.body || 'Bạn có thông báo mới.';
-    const icon = payload.notification?.icon || '/logo192.png';
+const parseActions = (rawActions) => {
+    if (!rawActions) {
+        return [];
+    }
+    try {
+        const parsed = typeof rawActions === 'string' ? JSON.parse(rawActions) : rawActions;
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('[FCM][SW] Unable to parse actions payload', error);
+        return [];
+    }
+};
 
-    const notificationOptions = {
-        body: notificationBody,
-        icon,
-        badge: '/logo192.png',
-        data: {
-            url: payload.data?.url || '/',
-            ...payload.data,
+const buildNotificationFromData = (dataPayload = {}) => {
+    const notificationTitle = dataPayload.title || 'EduFinAI';
+    const notificationBody = dataPayload.body || 'Bạn có thông báo mới.';
+    const icon = dataPayload.icon || '/logo192.png';
+    const badge = dataPayload.badge || '/logo192.png';
+    const targetUrl = dataPayload.url || '/';
+
+    return {
+        title: notificationTitle,
+        options: {
+            body: notificationBody,
+            icon,
+            badge,
+            data: {
+                url: targetUrl,
+                ...dataPayload,
+            },
+            actions: parseActions(dataPayload.actions),
         },
-        actions: payload.data?.actions ? JSON.parse(payload.data.actions) : [],
     };
+};
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+messaging.onBackgroundMessage((payload) => {
+    if (payload?.notification) {
+        console.warn(
+            '[FCM][SW] Received push payload with "notification" field. To avoid duplicate toasts, send data-only payloads.'
+        );
+    }
+
+    const dataPayload = payload?.data || {};
+    const notification = buildNotificationFromData(dataPayload);
+
+    self.registration.showNotification(notification.title, notification.options);
 });
 
 self.addEventListener('notificationclick', (event) => {

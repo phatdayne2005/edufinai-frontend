@@ -128,12 +128,52 @@ export const addReward = async (rewardData) => {
 };
 
 /**
- * Get user rewards
- * @param {string} userId - User ID
- * @returns {Promise<Object>} User reward details
+ * Get current user's rewards (from JWT token)
+ * @returns {Promise<Object>} User reward details { userId, totalScore, rewardDetail[] }
  */
-export const getUserRewards = async (userId) => {
-    return apiRequest(`/reward/${userId}`);
+export const getUserRewards = async () => {
+    return apiRequest('/reward');
+};
+
+/**
+ * Badge API
+ */
+
+/**
+ * Get current user's badges
+ * @returns {Promise<Object>} Badge list response { code, result[], message }
+ */
+export const getMyBadges = async () => {
+    return apiRequest('/badge/me');
+};
+
+/**
+ * Challenge Progress API
+ */
+
+/**
+ * Get progress of a specific challenge
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<Object>} Challenge progress { code, result, message }
+ */
+export const getChallengeProgress = async (challengeId) => {
+    return apiRequest(`/challenge/${challengeId}/progress`);
+};
+
+/**
+ * Get active challenges for current user
+ * @returns {Promise<Object>} Active challenges response { code, result[], message }
+ */
+export const getActiveChallenges = async () => {
+    return apiRequest('/challenge/me/active');
+};
+
+/**
+ * Get completed challenges for current user
+ * @returns {Promise<Object>} Completed challenges response { code, result[], message }
+ */
+export const getCompletedChallenges = async () => {
+    return apiRequest('/challenge/me/completed');
 };
 
 /**
