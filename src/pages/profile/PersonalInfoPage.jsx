@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import Header from '../../components/layout/Header';
@@ -31,6 +31,32 @@ const PersonalInfoPage = () => {
   const [loading, setLoading] = useState(false);
   const [updateError, setUpdateError] = useState('');
 
+  const tabsRef = useRef({});
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeTabElement = tabsRef.current[activeTab];
+      if (activeTabElement) {
+        setIndicatorStyle({
+          left: activeTabElement.offsetLeft,
+          width: activeTabElement.offsetWidth,
+        });
+      }
+    };
+
+    updateIndicator();
+    window.addEventListener('resize', updateIndicator);
+    
+    // Small timeout to ensure layout is stable (e.g. fonts loaded)
+    const timeoutId = setTimeout(updateIndicator, 50);
+
+    return () => {
+      window.removeEventListener('resize', updateIndicator);
+      clearTimeout(timeoutId);
+    };
+  }, [activeTab]);
+
   // Fallback to default values if user is not loaded yet
   const displayUser = user || {
     name: 'Loading...',
@@ -47,12 +73,14 @@ const PersonalInfoPage = () => {
     padding: '12px 20px',
     border: 'none',
     backgroundColor: 'transparent',
-    borderBottom: `2px solid ${isActive ? accentColor : 'transparent'}`,
+    borderBottom: '2px solid transparent',
     color: isActive ? accentColor : textMutedColor,
     fontWeight: isActive ? 600 : 500,
     cursor: 'pointer',
     fontSize: '14px',
-    transition: 'color 0.2s ease, border-color 0.2s ease',
+    transition: 'color 0.3s ease',
+    position: 'relative',
+    zIndex: 1,
   });
 
   const handleBack = () => {
@@ -673,8 +701,10 @@ const PersonalInfoPage = () => {
         gap: '8px',
         marginBottom: '20px',
         borderBottom: `1px solid ${borderSubtleColor}`,
+        position: 'relative',
       }}>
         <button
+          ref={(el) => (tabsRef.current['view'] = el)}
           type="button"
           onClick={() => {
             setActiveTab('view');
@@ -686,6 +716,7 @@ const PersonalInfoPage = () => {
           Xem thông tin
         </button>
         <button
+          ref={(el) => (tabsRef.current['edit'] = el)}
           type="button"
           onClick={() => {
             setActiveTab('edit');
@@ -707,6 +738,7 @@ const PersonalInfoPage = () => {
           Cập nhật thông tin
         </button>
         <button
+          ref={(el) => (tabsRef.current['changePassword'] = el)}
           type="button"
           onClick={() => {
             setActiveTab('changePassword');
@@ -721,12 +753,42 @@ const PersonalInfoPage = () => {
         >
           Đổi mật khẩu
         </button>
+        
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '-1px',
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            height: '2px',
+            backgroundColor: accentColor,
+            transition: 'all 0.3s ease',
+            zIndex: 2,
+          }}
+        />
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'view' && renderViewTab()}
-      {activeTab === 'edit' && renderEditTab()}
-      {activeTab === 'changePassword' && renderChangePasswordTab()}
+      <div style={{ overflow: 'hidden', width: '100%', position: 'relative' }}>
+        <div
+          style={{
+            display: 'flex',
+            width: '100%',
+            transform: `translateX(-${['view', 'edit', 'changePassword'].indexOf(activeTab) * 100}%)`,
+            transition: 'transform 0.3s ease-in-out',
+          }}
+        >
+          <div style={{ minWidth: '100%', flexShrink: 0, boxSizing: 'border-box' }}>
+            {renderViewTab()}
+          </div>
+          <div style={{ minWidth: '100%', flexShrink: 0, boxSizing: 'border-box' }}>
+            {renderEditTab()}
+          </div>
+          <div style={{ minWidth: '100%', flexShrink: 0, boxSizing: 'border-box' }}>
+            {renderChangePasswordTab()}
+          </div>
+        </div>
+      </div>
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
