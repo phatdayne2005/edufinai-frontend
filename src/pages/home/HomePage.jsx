@@ -12,9 +12,8 @@ import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user: mockUser, goals, expenses } = useApp();
+  const { user: mockUser } = useApp();
   const { user: authUser } = useAuth();
-  const navigate = useNavigate();
   
   // Finance data states
   const [balance, setBalance] = useState(null);
@@ -83,23 +82,37 @@ const HomePage = () => {
     loadDailyReport();
   }, [loadDailyReport]);
 
+  // Handle transaction success
+  const handleTransactionSuccess = useCallback(() => {
+    loadFinanceData();
+  }, [loadFinanceData]);
+
+  // Handle goal success
+  const handleGoalSuccess = useCallback(() => {
+    loadFinanceData();
+  }, [loadFinanceData]);
+
   // Use real user name from AuthContext if available, otherwise fallback to mock data
   const displayName = authUser?.name || authUser?.username || mockUser?.name || 'Người dùng';
-
-  // Use mock data for financial information (balance, income, expense, savingRate)
-  const financialData = mockUser;
 
   // Role Check Logic
   const roles = authUser?.roles || [];
   const hasRole = (roleName) => {
+    if (!roles || roles.length === 0) return false;
     return roles.some(r => {
-      const rName = typeof r === 'string' ? r : r.name;
-      return rName && rName.toUpperCase().includes(roleName);
+      const rName = typeof r === 'string' ? r : (r?.name || r?.authority || '');
+      if (!rName) return false;
+      const upperRoleName = rName.toUpperCase();
+      const upperSearchName = roleName.toUpperCase();
+      // Check for exact match or contains (e.g., 'ROLE_CREATOR' contains 'CREATOR')
+      return upperRoleName === upperSearchName || 
+             upperRoleName.includes(upperSearchName) ||
+             upperRoleName === `ROLE_${upperSearchName}`;
     });
   };
 
   const isCreator = hasRole('CREATOR');
-  const isMod = hasRole('MOD');
+  const isMod = hasRole('MOD') || hasRole('MODERATOR');
 
   const headerAction = (isCreator || isMod) ? (
     <div className="flex gap-2">
@@ -139,21 +152,51 @@ const HomePage = () => {
              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
             <p className="text-sm text-text-secondary uppercase tracking-wider mb-1 font-medium relative z-10">Số dư hiện tại</p>
             <h2 className="text-4xl font-bold mb-6 tracking-tight bg-gradient-to-r from-primary to-primary-strong bg-clip-text text-transparent relative z-10">
-              {financialData.balance.toLocaleString('vi-VN')} đ
+              {loading ? (
+                <Loader2 size={32} className="animate-spin text-primary" />
+              ) : balance?.currentBalance !== undefined ? (
+                formatCurrency(balance.currentBalance)
+              ) : (
+                '0 đ'
+              )}
             </h2>
             
             <div className="flex justify-between flex-wrap gap-4 relative z-10">
               <div>
                 <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Thu nhập</p>
-                <p className="text-lg font-semibold text-success">+{(financialData.income / 1000000).toFixed(1)}M</p>
+                <p className="text-lg font-semibold text-success">
+                  {loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : summary?.monthlyIncome !== undefined ? (
+                    `+${formatCurrency(summary.monthlyIncome)}`
+                  ) : (
+                    '+0 đ'
+                  )}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Chi tiêu</p>
-                <p className="text-lg font-semibold text-danger">-{(financialData.expense / 1000000).toFixed(1)}M</p>
+                <p className="text-lg font-semibold text-danger">
+                  {loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : summary?.monthlyExpense !== undefined ? (
+                    `-${formatCurrency(summary.monthlyExpense)}`
+                  ) : (
+                    '-0 đ'
+                  )}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Tiết kiệm</p>
-                <p className="text-lg font-semibold text-info">{financialData.savingRate}%</p>
+                <p className="text-lg font-semibold text-info">
+                  {loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : summary?.savingRate !== undefined ? (
+                    `${summary.savingRate.toFixed(1)}%`
+                  ) : (
+                    '0%'
+                  )}
+                </p>
               </div>
             </div>
           </div>
