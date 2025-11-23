@@ -2,10 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, PenTool, Layout, BookOpen, BarChart2, Loader2, X, Edit2, Trash2, Send, FileText, Youtube, Plus, ChevronUp, ChevronDown, FileUp } from 'lucide-react';
 import { getMyLessons, getCreatorStats, createLesson, deleteLesson, updateLesson, submitLesson } from '../../services/learningApi';
-import * as pdfjsLib from 'pdfjs-dist';
+import { GlobalWorkerOptions, getDocument, version } from 'pdfjs-dist';
 
 // Set worker source for PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
 
 const CreatorDashboard = () => {
   const navigate = useNavigate();
@@ -186,7 +186,7 @@ const CreatorDashboard = () => {
     setIsExtracting(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+      const loadingTask = getDocument(arrayBuffer);
       const pdf = await loadingTask.promise;
       
       let extractedText = '';
