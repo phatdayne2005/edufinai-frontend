@@ -71,9 +71,30 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    getMyLessons: async (token) => {
+        const response = await fetch(`${API_BASE_URL}/creators/me/lessons`, {
+            headers: getHeaders(token),
+        });
+        return handleResponse(response);
+    },
+
     // Lesson APIs
     getAllLessons: async (token) => {
         const response = await fetch(`${API_BASE_URL}/lessons`, {
+            headers: getHeaders(token),
+        });
+        return handleResponse(response);
+    },
+
+    getLessonById: async (token, id) => {
+        const response = await fetch(`${API_BASE_URL}/lessons/${id}`, {
+            headers: getHeaders(token), // Auth is optional but good to pass if available
+        });
+        return handleResponse(response);
+    },
+
+    getLessonBySlug: async (token, slug) => {
+        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}`, {
             headers: getHeaders(token),
         });
         return handleResponse(response);
@@ -160,6 +181,23 @@ export const learningService = {
 
     updateEnrollmentProgress: async (token, enrollmentId, progressData) => {
         const response = await fetch(`${API_BASE_URL}/enrollments/${enrollmentId}/progress`, {
+            method: 'PUT',
+            headers: getHeaders(token),
+            body: JSON.stringify(progressData),
+        });
+        return handleResponse(response);
+    },
+
+    // New slug-based enrollment APIs
+    getMyEnrollmentForLesson: async (token, slug) => {
+        const response = await fetch(`${API_BASE_URL}/enrollments/lessons/${slug}/my-enrollment`, {
+            headers: getHeaders(token),
+        });
+        return handleResponse(response);
+    },
+
+    updateMyEnrollmentProgressBySlug: async (token, slug, progressData) => {
+        const response = await fetch(`${API_BASE_URL}/enrollments/lessons/${slug}/my-enrollment/progress`, {
             method: 'PUT',
             headers: getHeaders(token),
             body: JSON.stringify(progressData),

@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
 
 const QuizPage = () => {
-    const { lessonId } = useParams();
+    const { slug } = useParams();
     const navigate = useNavigate();
     const { getToken } = useAuth();
 
@@ -24,9 +24,8 @@ const QuizPage = () => {
             if (!token) return;
 
             try {
-                // Fetch lesson to get quizJson
-                const lessons = await learningService.getAllLessons(token);
-                const lesson = lessons.find(l => l.id === lessonId);
+                // Fetch lesson by slug to get quizJson
+                const lesson = await learningService.getLessonBySlug(token, slug);
 
                 if (lesson && lesson.quizJson) {
                     // Parse quizJson if it's a string, or use directly if object
@@ -58,7 +57,7 @@ const QuizPage = () => {
 
                 // Get enrollment ID
                 const enrollments = await learningService.getMyEnrollments(token);
-                const myEnrollment = enrollments.find(e => e.lessonId === lessonId);
+                const myEnrollment = enrollments.find(e => e.lessonId === lesson.id);
                 if (myEnrollment) {
                     setEnrollmentId(myEnrollment.id);
                 }
@@ -71,7 +70,7 @@ const QuizPage = () => {
         };
 
         fetchData();
-    }, [lessonId, getToken]);
+    }, [slug, getToken]);
 
     const handleAnswer = (optionIndex) => {
         if (submitted) return;
@@ -98,23 +97,30 @@ const QuizPage = () => {
             }
         });
 
-        const finalScore = Math.round((correctCount / questions.length) * 100);
-        setScore(finalScore);
+        // Logic: Mỗi câu 10 điểm
+        const pointsPerQuestion = 10;
+        const totalPoints = questions.length * pointsPerQuestion;
+        const earnedPoints = correctCount * pointsPerQuestion;
+
+        setScore(earnedPoints);
         setSubmitted(true);
 
-        // Update progress via API
-        if (enrollmentId) {
-            const token = getToken();
-            try {
-                await learningService.updateEnrollmentProgress(token, enrollmentId, {
-                    status: finalScore >= 80 ? 'COMPLETED' : 'IN_PROGRESS',
-                    progressPercent: 100,
-                    score: finalScore,
-                    addAttempt: 1
-                });
-            } catch (error) {
-                console.error('Failed to submit progress:', error);
-            }
+        // Logic pass: Đạt >= 80% số điểm tối đa thì tính là hoàn thành
+        const isPassed = (correctCount / questions.length) >= 0.8;
+
+        // Update progress via new slug-based API
+        const token = getToken();
+        try {
+            await learningService.updateMyEnrollmentProgressBySlug(token, slug, {
+                status: isPassed ? 'COMPLETED' : 'IN_PROGRESS',
+                progressPercent: 100, // Đã làm xong bài quiz
+                score: earnedPoints,
+                addAttempt: 1
+            });
+            console.log('Progress updated successfully!');
+        } catch (error) {
+            console.error('Failed to submit progress:', error);
+            alert('Không thể lưu kết quả: ' + error.message);
         }
     };
 
@@ -123,6 +129,8 @@ const QuizPage = () => {
 
     const currentQuestion = questions[currentQuestionIndex];
     const isLastQuestion = currentQuestionIndex === questions.length - 1;
+    const maxPoints = questions.length * 10;
+    const isPassed = (score / maxPoints) >= 0.8;
 
     return (
         <div style={styles.page}>
@@ -138,19 +146,20 @@ const QuizPage = () => {
             </div>
 
             {!submitted ? (
-                <div style={{ ...styles.section, backgroundColor: '#fff', padding: 24, borderRadius: 16, border: '1px solid #E0E0E0', minHeight: 300 }}>
-                    <h3 style={{ fontSize: 18, marginBottom: 24 }}>{currentQuestion.question}</h3>
+                <div style={{ ...styles.section, backgroundColor: 'var(--surface-card)', padding: 24, borderRadius: 16, border: '1px solid var(--border-subtle)', minHeight: 300 }}>
+                    <h3 style={{ fontSize: 18, marginBottom: 24, color: 'var(--text-primary)' }}>{currentQuestion.question}</h3>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {currentQuestion.options.map((option, idx) => (
+                        {(currentQuestion.answer || currentQuestion.options || []).map((option, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => handleAnswer(idx)}
                                 style={{
                                     padding: '16px',
                                     borderRadius: '12px',
-                                    border: answers[currentQuestionIndex] === idx ? '2px solid #4CAF50' : '1px solid #E0E0E0',
-                                    backgroundColor: answers[currentQuestionIndex] === idx ? '#E8F5E9' : '#fff',
+                                    border: answers[currentQuestionIndex] === idx ? '2px solid #4CAF50' : '1px solid var(--border-subtle)',
+                                    backgroundColor: answers[currentQuestionIndex] === idx ? 'rgba(76, 175, 80, 0.1)' : 'var(--surface-app)',
+                                    color: 'var(--text-primary)',
                                     textAlign: 'left',
                                     fontSize: 16,
                                     cursor: 'pointer',
@@ -166,7 +175,14 @@ const QuizPage = () => {
                         <button
                             onClick={handlePrev}
                             disabled={currentQuestionIndex === 0}
-                            style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#f5f5f5', color: currentQuestionIndex === 0 ? '#ccc' : '#333', cursor: 'pointer' }}
+                            style={{
+                                padding: '10px 20px',
+                                borderRadius: 8,
+                                border: 'none',
+                                background: currentQuestionIndex === 0 ? 'var(--surface-muted)' : 'var(--surface-hover)',
+                                color: currentQuestionIndex === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                                cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
+                            }}
                         >
                             Trước
                         </button>
@@ -175,7 +191,15 @@ const QuizPage = () => {
                             <button
                                 onClick={handleSubmit}
                                 disabled={Object.keys(answers).length < questions.length}
-                                style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#4CAF50', color: '#fff', cursor: 'pointer', opacity: Object.keys(answers).length < questions.length ? 0.5 : 1 }}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    background: '#4CAF50',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    opacity: Object.keys(answers).length < questions.length ? 0.5 : 1
+                                }}
                             >
                                 Nộp bài
                             </button>
@@ -190,17 +214,20 @@ const QuizPage = () => {
                     </div>
                 </div>
             ) : (
-                <div style={{ textAlign: 'center', padding: 40, backgroundColor: '#fff', borderRadius: 16, border: '1px solid #E0E0E0' }}>
-                    {score >= 80 ? (
-                        <CheckCircle size={64} color="#4CAF50" style={{ marginBottom: 16 }} />
-                    ) : (
-                        <XCircle size={64} color="#F44336" style={{ marginBottom: 16 }} />
-                    )}
-                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>
-                        {score >= 80 ? 'Chúc mừng!' : 'Cần cố gắng hơn!'}
-                    </h2>
-                    <p style={{ fontSize: 16, color: '#666', marginBottom: 24 }}>
-                        Bạn đạt được <span style={{ fontWeight: 'bold', color: score >= 80 ? '#4CAF50' : '#F44336' }}>{score}/100</span> điểm.
+                <div style={{ textAlign: 'center', padding: 40, backgroundColor: 'var(--surface-card)', borderRadius: 16, border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+                        {isPassed ? (
+                            <CheckCircle size={48} color="#4CAF50" />
+                        ) : (
+                            <XCircle size={48} color="#F44336" />
+                        )}
+                        <h2 style={{ fontSize: 28, margin: 0, color: 'var(--text-primary)' }}>
+                            {isPassed ? 'Chúc mừng!' : 'Cần cố gắng hơn!'}
+                        </h2>
+                    </div>
+
+                    <p style={{ fontSize: 18, color: 'var(--text-secondary)', marginBottom: 24 }}>
+                        Bạn đạt được <span style={{ fontWeight: 'bold', color: isPassed ? '#4CAF50' : '#F44336', fontSize: 24 }}>{score}/{maxPoints}</span> điểm.
                     </p>
                     <button onClick={() => navigate('/learning')} style={styles.addButton}>
                         Quay về danh sách bài học

@@ -76,6 +76,7 @@ Retrieve the profile of the currently logged-in learner.
 ```json
 {
   "id": "uuid",
+  "username": "creator_username",
   "totalLessons": 0
 }
 ```
@@ -89,6 +90,24 @@ Retrieve the profile of the currently logged-in learner.
 **Endpoint:** `GET /api/creators`
 
 **Response:** `200 OK` (Array of CreatorRes)
+
+### 2.4 Get My Lessons ✨ NEW
+**Endpoint:** `GET /api/creators/me/lessons`
+
+**Auth:** Required (`SCOPE_ROLE_CREATOR`)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "uuid",
+    "title": "Lesson Title",
+    "status": "DRAFT | PENDING | APPROVED | REJECTED",
+    "createdAt": "2024-01-01T10:00:00"
+    // ... other lesson fields
+  }
+]
+```
 
 ---
 
@@ -123,46 +142,34 @@ Retrieve the profile of the currently logged-in learner.
 ]
 ```
 
-### 3.2 Filter Lessons by Tag
-**Endpoint:** `GET /api/lessons/tags/{tag}`
+### 3.2 Get Lesson By ID
+**Endpoint:** `GET /api/lessons/{id}`
+
+**Auth:** Optional (Public)
+
+**Response:** `200 OK` (LessonRes)
+
+### 3.3 Get Lesson by Slug ✨ NEW
+**Endpoint:** `GET /api/lessons/slug/{slug}`
 
 **Path Parameters:**
-- `tag`: `BUDGETING` | `INVESTING` | `SAVING` | `DEBT` | `TAX`
+- `slug`: The unique slug of the lesson (e.g., `introduction-to-budgeting`)
 
-**Response:** `200 OK` (Array of LessonRes)
-
-### 3.3 Filter Lessons by Difficulty
-**Endpoint:** `GET /api/lessons/difficulty/{difficulty}`
-
-**Path Parameters:**
-- `difficulty`: `BASIC` | `INTERMEDIATE` | `ADVANCED`
-
-**Response:** `200 OK` (Array of LessonRes)
-
-### 3.4 Filter Lessons by Status
-**Endpoint:** `GET /api/lessons/status/{status}`
-
-**Path Parameters:**
-- `status`: `DRAFT` | `PENDING` | `APPROVED` | `REJECTED`
-
-**Response:** `200 OK` (Array of LessonRes)
-
-### 3.5 Create Lesson
-**Endpoint:** `POST /api/lessons`
-
-**Auth:** Required (`SCOPE_ROLE_CREATOR`)
-
-**Request Body:**
+**Response:** `200 OK`
 ```json
 {
-  "title": "string (required, max 150 chars)",
-  "description": "string (max 1000 chars)",
-  "content": "string (required, lesson content)",
+  "id": "uuid",
+  "title": "Introduction to Budgeting",
+  "description": "Learn the basics of budgeting",
+  "slug": "introduction-to-budgeting",
+  "content": "Full lesson content...",
+  "status": "APPROVED",
+  "difficulty": "BASIC",
   "durationMinutes": 30,
-  "difficulty": "BASIC | INTERMEDIATE | ADVANCED (required)",
-  "thumbnailUrl": "string (max 255 chars)",
-  "videoUrl": "string (max 255 chars)",
-  "tags": ["BUDGETING", "INVESTING"],
+  "tags": ["BUDGETING", "SAVING"],
+  "thumbnailUrl": "https://...",
+  "videoUrl": "https://...",
+  "commentByMod": null,
   "quizJson": {
     "questions": [
       {
@@ -172,39 +179,56 @@ Retrieve the profile of the currently logged-in learner.
         "correctAnswer": 0
       }
     ]
-  }
+  },
+  "creatorId": "uuid",
+  "moderatorId": "uuid",
+  "createdAt": "2024-01-01T10:00:00Z",
+  "updatedAt": "2024-01-01T10:00:00Z",
+  "publishedAt": "2024-01-01T10:00:00Z"
 }
 ```
 
-**Response:** `201 Created` (LessonRes)
-
-**Note:** Lesson is created with status `DRAFT` and a unique slug is auto-generated from the title.
-
-### 3.6 Update Lesson
-**Endpoint:** `PUT /api/lessons/{lessonId}`
-
-**Auth:** Required (`SCOPE_ROLE_CREATOR`, must be owner)
-
-**Request Body:** (All fields optional)
+**Error:** `404 Not Found` if slug doesn't exist
 ```json
 {
-  "title": "string",
-  "description": "string",
-  "content": "string",
-  "durationMinutes": 30,
-  "difficulty": "BASIC | INTERMEDIATE | ADVANCED",
-  "thumbnailUrl": "string",
-  "videoUrl": "string",
-  "tags": ["BUDGETING"],
-  "quizJson": { ... }
+  "code": 9999,
+  "message": "Lesson not found with slug: introduction-to-budgeting"
 }
 ```
 
-**Response:** `200 OK` (LessonRes)
+**Note:** This endpoint is useful for creating SEO-friendly URLs (e.g., `/learning/lesson/introduction-to-budgeting` instead of `/learning/lesson/550e8400-...`). The slug is automatically generated when creating a lesson.
+
+### 3.4 Filter Lessons by Tag
+**Endpoint:** `GET /api/lessons/tags/{tag}`
+
+**Path Parameters:**
+- `tag`: `BUDGETING` | `INVESTING` | `SAVING` | `DEBT` | `TAX`
+
+**Response:** `200 OK` (Array of LessonRes)
+
+### 3.5 Filter Lessons by Difficulty
+**Endpoint:** `GET /api/lessons/difficulty/{difficulty}`
+
+**Path Parameters:**
+- `difficulty`: `BASIC` | `INTERMEDIATE` | `ADVANCED`
+
+**Response:** `200 OK` (Array of LessonRes)
+
+### 3.6 Filter Lessons by Status
+**Endpoint:** `GET /api/lessons/status/{status}`
+
+**Path Parameters:**
+- `status`: `DRAFT` | `PENDING` | `APPROVED` | `REJECTED`
+
+**Response:** `200 OK` (Array of LessonRes)
+
+### 3.7 Create Lesson
+**Endpoint:** `POST /api/lessons`
+
 
 **Note:** Updating a lesson resets its status to `DRAFT`.
 
-### 3.7 Submit Lesson for Review
+### 3.9 Submit Lesson for Review
 **Endpoint:** `PUT /api/lessons/{lessonId}/submit`
 
 **Auth:** Required (`SCOPE_ROLE_CREATOR`, must be owner)
@@ -213,7 +237,7 @@ Retrieve the profile of the currently logged-in learner.
 
 **Note:** Changes lesson status from `DRAFT` to `PENDING`.
 
-### 3.8 Delete Lesson
+### 3.10 Delete Lesson
 **Endpoint:** `DELETE /api/lessons/{lessonId}`
 
 **Auth:** Required (`SCOPE_ROLE_CREATOR`, must be owner)
@@ -292,6 +316,89 @@ Retrieve the profile of the currently logged-in learner.
 - `score` is automatically converted to learning points and added to the learner's profile.
 - Points are only added once (when transitioning to COMPLETED for the first time).
 
+### 4.5 Get My Enrollment for Lesson (by Slug) ✨ NEW
+**Endpoint:** `GET /api/enrollments/lessons/{slug}/my-enrollment`
+
+**Auth:** Required (`SCOPE_ROLE_LEARNER`)
+
+**Path Parameters:**
+- `slug`: The lesson slug (e.g., `introduction-to-budgeting`)
+
+**Response:** `200 OK`
+```json
+{
+  "id": "uuid",
+  "learnerId": "uuid",
+  "lessonId": "uuid",
+  "status": "IN_PROGRESS",
+  "progressPercent": 50,
+  "score": null,
+  "attempts": 1,
+  "startedAt": "2024-01-01T10:00:00",
+  "completedAt": null,
+  "lastActivityAt": "2024-01-01T11:00:00",
+  "createdAt": "2024-01-01T10:00:00",
+  "updatedAt": "2024-01-01T11:00:00"
+}
+```
+
+**Error Responses:**
+- `404 Not Found` - Lesson with this slug doesn't exist
+- `404 Not Found` - User is not enrolled in this lesson (message: "Not enrolled in this lesson")
+
+**Note:** This endpoint uses lesson slug + JWT token to identify the enrollment, eliminating the need to pass enrollment ID in URLs. Perfect for SEO-friendly routes like `/learning/quiz/introduction-to-budgeting`.
+
+### 4.6 Update My Enrollment Progress (by Slug) ✨ NEW
+**Endpoint:** `PUT /api/enrollments/lessons/{slug}/my-enrollment/progress`
+
+**Auth:** Required (`SCOPE_ROLE_LEARNER`)
+
+**Path Parameters:**
+- `slug`: The lesson slug (e.g., `introduction-to-budgeting`)
+
+**Request Body:**
+```json
+{
+  "status": "IN_PROGRESS | COMPLETED | DROPPED (required)",
+  "progressPercent": 100,
+  "score": 80,
+  "addAttempt": 1
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "uuid",
+  "learnerId": "uuid",
+  "lessonId": "uuid",
+  "status": "COMPLETED",
+  "progressPercent": 100,
+  "score": 80,
+  "attempts": 2,
+  "startedAt": "2024-01-01T10:00:00",
+  "completedAt": "2024-01-01T12:00:00",
+  "lastActivityAt": "2024-01-01T12:00:00",
+  "createdAt": "2024-01-01T10:00:00",
+  "updatedAt": "2024-01-01T12:00:00"
+}
+```
+
+**Error Responses:**
+- `404 Not Found` - Lesson with this slug doesn't exist
+- `404 Not Found` - User is not enrolled in this lesson
+
+**Note:** Frontend can now update progress without knowing the enrollment ID. Just pass the lesson slug and the system will automatically find the correct enrollment for the authenticated user.
+
+**Example Usage in Frontend:**
+```javascript
+// Old way (enrollment ID in URL):
+PUT /api/enrollments/550e8400.../progress
+
+// New way (clean URL):
+PUT /api/enrollments/lessons/introduction-to-budgeting/my-enrollment/progress
+```
+
 ---
 
 ## 5. Moderator APIs
@@ -299,7 +406,7 @@ Retrieve the profile of the currently logged-in learner.
 ### 5.1 List All Moderators
 **Endpoint:** `GET /api/moderators`
 
-**Auth:** Required (`SCOPE_ROLE_MODERATOR`)
+**Auth:** Required (`SCOPE_ROLE_MOD`)
 
 **Response:** `200 OK`
 ```json
@@ -315,7 +422,7 @@ Retrieve the profile of the currently logged-in learner.
 ### 5.2 List Lessons for Moderation
 **Endpoint:** `GET /api/moderators/lessons`
 
-**Auth:** Required (`SCOPE_ROLE_MODERATOR`)
+**Auth:** Required (`SCOPE_ROLE_MOD`)
 
 **Query Parameters:**
 - `status` (optional): `PENDING` | `APPROVED` | `REJECTED` (default: `PENDING`)
@@ -443,3 +550,52 @@ Server error.
      ]
    }
    ```
+
+6. **SEO-Friendly URLs with Context-Aware Endpoints:** ✨ NEW
+   
+   **Problem:** UUID-based URLs are ugly and not SEO-friendly:
+   ```
+   ❌ /learning/lesson/550e8400-e29b-41d4-a716-446655440000
+   ❌ /learning/quiz/550e8400-e29b-41d4-a716-446655440000
+   ❌ /enrollment/e7f4b8a2-3c1d-4f9e-b6a5-1234567890ab/progress
+   ```
+
+   **Solution:** Use lesson slugs + context-aware endpoints:
+   ```
+   ✅ /learning/lesson/introduction-to-budgeting
+   ✅ /learning/quiz/introduction-to-budgeting
+   ✅ Update progress via: PUT /api/enrollments/lessons/introduction-to-budgeting/my-enrollment/progress
+   ```
+
+   **How it works:**
+   - **Lesson Slug:** Automatically generated from lesson title when created
+   - **Context-Aware:** Backend uses JWT token (user ID) + slug (lesson) to find the correct resource
+   - **No ID in URL:** Enrollment ID is never exposed in URLs
+
+   **Frontend Implementation Example:**
+   ```javascript
+   // In QuizPage or LessonDetailPage component
+   const { slug } = useParams(); // Get slug from URL
+   
+   // Fetch lesson by slug
+   const lesson = await api.getLessonBySlug(slug);
+   
+   // Get my enrollment for this lesson (no need to know enrollment ID)
+   const enrollment = await api.getMyEnrollmentForLesson(slug);
+   
+   // Submit quiz results
+   await api.updateMyEnrollmentProgress(slug, {
+     status: "COMPLETED",
+     progressPercent: 100,
+     score: 80,
+     addAttempt: 1
+   });
+   ```
+
+   **Benefits:**
+   - Clean, readable URLs
+   - Better SEO
+   - Easier to share
+   - Less chance of accidentally exposing sensitive IDs
+   - Simpler frontend code
+
