@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as adminApi from '../../services/authApi';
 import * as gamificationApi from '../../services/gamificationApi';
+import { styles } from '../../styles/appStyles';
 import { 
   Users, 
   Shield, 
+  ArrowLeft,
   UserCheck, 
   FileText, 
   Search, 
@@ -25,6 +28,7 @@ import {
 import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'challenges', 'leaderboard', 'settings'
   
@@ -373,7 +377,7 @@ const AdminDashboard = () => {
   const dashboardStyles = {
     page: {
       minHeight: '100vh',
-      backgroundColor: 'var(--surface-app)',
+      backgroundColor: 'transparent',
       padding: '32px 16px 48px',
       color: 'var(--text-primary)',
     },
@@ -383,6 +387,19 @@ const AdminDashboard = () => {
       display: 'flex',
       flexDirection: 'column',
       gap: '24px',
+    },
+    backButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      color: 'var(--text-muted)',
+      marginBottom: '8px',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '16px',
+      transition: 'color 0.2s',
+      width: 'fit-content',
     },
     heroCard: {
       background: 'var(--gradient-hero)',
@@ -864,8 +881,19 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div style={dashboardStyles.page}>
-      <div style={dashboardStyles.main}>
+    <div style={{ ...styles.app, paddingBottom: 0 }}>
+      <div style={dashboardStyles.page}>
+        <div style={dashboardStyles.main}>
+        <button 
+          onClick={() => navigate('/')}
+          style={dashboardStyles.backButton}
+          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+        >
+          <ArrowLeft size={20} />
+          Quay lại trang chủ
+        </button>
+
         <section style={dashboardStyles.heroCard}>
           <div style={dashboardStyles.heroText}>
             <div style={dashboardStyles.heroBadge}>
@@ -1452,7 +1480,7 @@ const AdminDashboard = () => {
                 placeholder="Username"
                 value={formData.username}
                 disabled
-                style={{ ...inputStyle, backgroundColor: '#f5f5f5' }}
+                style={{ ...inputStyle, opacity: 0.7, cursor: 'not-allowed' }}
               />
               <input
                 type="password"
@@ -1539,6 +1567,7 @@ const AdminDashboard = () => {
           }
         `}
         </style>
+      </div>
     </div>
   );
 };

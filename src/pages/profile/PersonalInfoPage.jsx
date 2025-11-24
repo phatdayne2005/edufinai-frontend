@@ -69,11 +69,31 @@ const PersonalInfoPage = () => {
   const textMutedColor = 'var(--text-secondary)';
   const borderSubtleColor = 'var(--border-subtle)';
 
+  const infoCardStyle = { ...styles.infoCard, border: 'none', boxShadow: 'none' };
+  const infoRowStyle = { ...styles.infoRow, borderBottom: 'none' };
+  const infoInputStyle = {
+    ...styles.infoValue,
+    border: 'none',
+    borderRadius: '8px',
+    padding: '10px 14px',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: textPrimaryColor,
+    boxShadow: 'none',
+  };
+  const authInputStyle = {
+    ...styles.authInput,
+    border: 'none',
+    borderRadius: '999px',
+    padding: '14px 20px',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: textPrimaryColor,
+    boxShadow: 'none',
+  };
+
   const getTabButtonStyle = (isActive) => ({
     padding: '12px 20px',
     border: 'none',
     backgroundColor: 'transparent',
-    borderBottom: '2px solid transparent',
     color: isActive ? accentColor : textMutedColor,
     fontWeight: isActive ? 600 : 500,
     cursor: 'pointer',
@@ -316,53 +336,64 @@ const PersonalInfoPage = () => {
   const renderViewTab = () => (
     <>
       <div style={styles.profileCard}>
-        <div style={styles.profileAvatar}>{displayUser.avatar || '👤'}</div>
-        <h3 style={styles.profileName}>
-          {displayUser.name || displayUser.username || 'User'}
-        </h3>
-        <p style={styles.profileLevel}>
-          {displayUser.email && <span>{displayUser.email}</span>}
-          {displayUser.username && displayUser.email && ' • '}
-          {displayUser.username && <span>@{displayUser.username}</span>}
-        </p>
+        <div style={{
+           position: 'absolute',
+           top: 0,
+           left: 0,
+           right: 0,
+           bottom: 0,
+           background: 'linear-gradient(to bottom right, hsl(var(--accent-hue) var(--accent-saturation) var(--accent-lightness) / 0.05), transparent)',
+           pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={styles.profileAvatar}>{displayUser.avatar || '👤'}</div>
+          <h3 style={styles.profileName}>
+            {displayUser.name || displayUser.username || 'User'}
+          </h3>
+          <p style={styles.profileLevel}>
+            {displayUser.email && <span>{displayUser.email}</span>}
+            {displayUser.username && displayUser.email && ' • '}
+            {displayUser.username && <span>@{displayUser.username}</span>}
+          </p>
+        </div>
       </div>
 
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>Chi tiết thông tin</h3>
-        <div style={styles.infoCard}>
-          <div style={styles.infoRow}>
+        <div style={infoCardStyle}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Tên đăng nhập:</span>
             <span style={styles.infoValue}>{displayUser.username || 'N/A'}</span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Họ:</span>
             <span style={styles.infoValue}>{displayUser.firstName || 'N/A'}</span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Tên:</span>
             <span style={styles.infoValue}>{displayUser.lastName || 'N/A'}</span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Email:</span>
             <span style={styles.infoValue}>{displayUser.email || 'N/A'}</span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Số điện thoại:</span>
             <span style={styles.infoValue}>{displayUser.phone || 'N/A'}</span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Ngày sinh:</span>
             <span style={styles.infoValue}>
               {displayUser.dob ? new Date(displayUser.dob).toLocaleDateString('vi-VN') : 'N/A'}
             </span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Vai trò:</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flex: 1 }}>
               {displayUser.roles && displayUser.roles.length > 0 ? (
@@ -429,7 +460,7 @@ const PersonalInfoPage = () => {
               value={changePasswordData.oldPassword}
               onChange={(e) => handleChangePasswordInput('oldPassword', e.target.value)}
               placeholder="Nhập mật khẩu cũ"
-              style={styles.authInput}
+              style={authInputStyle}
               required
             />
           </div>
@@ -444,7 +475,7 @@ const PersonalInfoPage = () => {
               value={changePasswordData.newPassword}
               onChange={(e) => handleChangePasswordInput('newPassword', e.target.value)}
               placeholder="Tối thiểu 6 ký tự"
-              style={styles.authInput}
+              style={authInputStyle}
               required
               minLength={6}
             />
@@ -460,7 +491,7 @@ const PersonalInfoPage = () => {
               value={changePasswordData.confirmPassword}
               onChange={(e) => handleChangePasswordInput('confirmPassword', e.target.value)}
               placeholder="Nhập lại mật khẩu mới"
-              style={styles.authInput}
+              style={authInputStyle}
               required
             />
           </div>
@@ -501,7 +532,7 @@ const PersonalInfoPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Nhập mật khẩu"
-                style={styles.authInput}
+                style={authInputStyle}
                 required
               />
               {passwordError && (
@@ -521,98 +552,68 @@ const PersonalInfoPage = () => {
     return (
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>Cập nhật thông tin</h3>
-        <div style={styles.infoCard}>
-          <div style={styles.infoRow}>
+        <div style={infoCardStyle}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Tên đăng nhập:</span>
             <span style={styles.infoValue}>{displayUser.username || 'N/A'}</span>
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Họ:</span>
             <input
               type="text"
               value={formData.firstName}
               onChange={(e) => handleInputChange('firstName', e.target.value)}
-              style={{
-                ...styles.infoValue,
-                border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                padding: '8px',
-                backgroundColor: '#fff',
-              }}
+              style={infoInputStyle}
               placeholder="Nhập họ"
             />
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Tên:</span>
             <input
               type="text"
               value={formData.lastName}
               onChange={(e) => handleInputChange('lastName', e.target.value)}
-              style={{
-                ...styles.infoValue,
-                border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                padding: '8px',
-                backgroundColor: '#fff',
-              }}
+              style={infoInputStyle}
               placeholder="Nhập tên"
             />
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Email:</span>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              style={{
-                ...styles.infoValue,
-                border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                padding: '8px',
-                backgroundColor: '#fff',
-              }}
+              style={infoInputStyle}
               placeholder="Nhập email"
             />
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Số điện thoại:</span>
             <input
               type="tel"
               value={formData.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
-              style={{
-                ...styles.infoValue,
-                border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                padding: '8px',
-                backgroundColor: '#fff',
-              }}
+              style={infoInputStyle}
               placeholder="Nhập số điện thoại"
             />
           </div>
           
-          <div style={styles.infoRow}>
+          <div style={infoRowStyle}>
             <span style={styles.infoLabel}>Ngày sinh:</span>
             <input
               type="date"
               value={formData.dob}
               onChange={(e) => handleInputChange('dob', e.target.value)}
-              style={{
-                ...styles.infoValue,
-                border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                padding: '8px',
-                backgroundColor: '#fff',
-              }}
+              style={infoInputStyle}
             />
           </div>
           
           {displayUser.roles && displayUser.roles.length > 0 && (
-            <div style={styles.infoRow}>
+            <div style={infoRowStyle}>
               <span style={styles.infoLabel}>Vai trò:</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flex: 1 }}>
                 {displayUser.roles.map((role, index) => (
@@ -667,7 +668,8 @@ const PersonalInfoPage = () => {
   };
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.app, paddingBottom: 0 }}>
+      <div style={styles.page}>
       <Header 
         title="Thông tin cá nhân" 
         subtitle="Chi tiết thông tin tài khoản"
@@ -768,7 +770,6 @@ const PersonalInfoPage = () => {
         />
       </div>
 
-      {/* Tab Content */}
       <div style={{ overflow: 'hidden', width: '100%', position: 'relative' }}>
         <div
           style={{
@@ -776,6 +777,7 @@ const PersonalInfoPage = () => {
             width: '100%',
             transform: `translateX(-${['view', 'edit', 'changePassword'].indexOf(activeTab) * 100}%)`,
             transition: 'transform 0.3s ease-in-out',
+            alignItems: 'flex-start', // Ensure items are aligned at top
           }}
         >
           <div style={{ minWidth: '100%', flexShrink: 0, boxSizing: 'border-box' }}>
@@ -870,6 +872,7 @@ const PersonalInfoPage = () => {
         </div>
       )}
 
+      </div>
     </div>
   );
 };
