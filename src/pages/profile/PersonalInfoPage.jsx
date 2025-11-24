@@ -316,15 +316,26 @@ const PersonalInfoPage = () => {
   const renderViewTab = () => (
     <>
       <div style={styles.profileCard}>
-        <div style={styles.profileAvatar}>{displayUser.avatar || '👤'}</div>
-        <h3 style={styles.profileName}>
-          {displayUser.name || displayUser.username || 'User'}
-        </h3>
-        <p style={styles.profileLevel}>
-          {displayUser.email && <span>{displayUser.email}</span>}
-          {displayUser.username && displayUser.email && ' • '}
-          {displayUser.username && <span>@{displayUser.username}</span>}
-        </p>
+        <div style={{
+           position: 'absolute',
+           top: 0,
+           left: 0,
+           right: 0,
+           bottom: 0,
+           background: 'linear-gradient(to bottom right, hsl(var(--accent-hue) var(--accent-saturation) var(--accent-lightness) / 0.05), transparent)',
+           pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={styles.profileAvatar}>{displayUser.avatar || '👤'}</div>
+          <h3 style={styles.profileName}>
+            {displayUser.name || displayUser.username || 'User'}
+          </h3>
+          <p style={styles.profileLevel}>
+            {displayUser.email && <span>{displayUser.email}</span>}
+            {displayUser.username && displayUser.email && ' • '}
+            {displayUser.username && <span>@{displayUser.username}</span>}
+          </p>
+        </div>
       </div>
 
       <div style={styles.section}>
@@ -667,7 +678,8 @@ const PersonalInfoPage = () => {
   };
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.app, paddingBottom: 0 }}>
+      <div style={styles.page}>
       <Header 
         title="Thông tin cá nhân" 
         subtitle="Chi tiết thông tin tài khoản"
@@ -870,6 +882,7 @@ const PersonalInfoPage = () => {
         </div>
       )}
 
+      </div>
     </div>
   );
 };
