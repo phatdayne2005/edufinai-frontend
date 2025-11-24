@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Target, ChevronRight, Brain, Loader2, RefreshCw, AlertCircle, PenTool, Shield } from 'lucide-react';
+import { Plus, Target, ChevronRight, Brain, Loader2, RefreshCw, AlertCircle, PenTool, Shield, UserCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
@@ -113,9 +113,19 @@ const HomePage = () => {
 
   const isCreator = hasRole('CREATOR');
   const isMod = hasRole('MOD') || hasRole('MODERATOR');
+  const isAdmin = hasRole('ADMIN');
 
-  const headerAction = (isCreator || isMod) ? (
+  const headerAction = (isCreator || isMod || isAdmin) ? (
     <div className="flex gap-2">
+      {isAdmin && (
+        <button
+          onClick={() => navigate('/admin/dashboard')}
+          className="px-3 py-2 bg-red-100 text-red-700 rounded-xl font-semibold hover:bg-red-200 transition-colors text-sm flex items-center gap-2"
+        >
+           <UserCog size={16} />
+           <span className="hidden sm:inline">Admin</span>
+        </button>
+      )}
       {isCreator && (
         <button
           onClick={() => navigate('/creator/dashboard')}
