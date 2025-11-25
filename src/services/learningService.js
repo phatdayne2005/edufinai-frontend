@@ -100,6 +100,31 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    updateLessonBySlug: async (token, slug, lessonData) => {
+        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}`, {
+            method: 'PUT',
+            headers: getHeaders(token),
+            body: JSON.stringify(lessonData),
+        });
+        return handleResponse(response);
+    },
+
+    submitLessonBySlug: async (token, slug) => {
+        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}/submit`, {
+            method: 'PUT',
+            headers: getHeaders(token),
+        });
+        return handleResponse(response);
+    },
+
+    deleteLessonBySlug: async (token, slug) => {
+        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}`, {
+            method: 'DELETE',
+            headers: getHeaders(token),
+        });
+        return handleResponse(response);
+    },
+
     filterLessonsByTag: async (token, tag) => {
         const response = await fetch(`${API_BASE_URL}/lessons/tags/${tag}`, {
             headers: getHeaders(token),
@@ -242,4 +267,5 @@ export const learningService = {
         });
         return handleResponse(response);
     },
+
 };

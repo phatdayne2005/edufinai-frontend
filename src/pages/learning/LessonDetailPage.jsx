@@ -60,22 +60,34 @@ const LessonDetailPage = () => {
             if (!token) return;
 
             try {
-                // Fetch lesson by slug
-                const lessonData = await learningService.getLessonBySlug(token, slug);
-                setLesson(lessonData);
-
-                // Fetch enrollment using new slug-based API
-                try {
-                    const enrollmentData = await learningService.getMyEnrollmentForLesson(token, slug);
-                    setEnrollment(enrollmentData);
-                } catch (err) {
-                    // 404 means not enrolled, which is OK
-                    if (err.message.includes('Not enrolled')) {
-                        setEnrollment(null);
-                    } else {
+                // Fetch lesson and enrollment in parallel
+                const [lessonData, enrollmentData] = await Promise.all([
+                    learningService.getLessonBySlug(token, slug),
+                    learningService.getMyEnrollmentForLesson(token, slug).catch(err => {
+                        // 404 means not enrolled, which is OK
+                        if (err.message && err.message.includes('Not enrolled')) {
+                            return null;
+                        }
                         console.error('Error fetching enrollment:', err);
+                        return null;
+                    })
+                ]);
+
+                // Fallback for totalQuestions if missing or 0
+                if (!lessonData.totalQuestions && !lessonData.total_question && lessonData.quizJson) {
+                    try {
+                        const quizData = typeof lessonData.quizJson === 'string'
+                            ? JSON.parse(lessonData.quizJson)
+                            : lessonData.quizJson;
+                        lessonData.totalQuestions = quizData.questions?.length || 0;
+                    } catch (e) {
+                        console.error('Failed to parse quiz:', e);
+                        lessonData.totalQuestions = 0;
                     }
                 }
+
+                setLesson(lessonData);
+                setEnrollment(enrollmentData);
             } catch (error) {
                 console.error('Error fetching lesson details:', error);
             } finally {
@@ -178,6 +190,10 @@ const LessonDetailPage = () => {
                         <Clock size={16} /> {lesson.durationMinutes} phút
                     </span>
 
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <HelpCircle size={16} /> {lesson.totalQuestions || lesson.total_question || 0} câu hỏi
+                    </span>
+
                     {lesson.tags && lesson.tags.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Tag size={16} />
@@ -239,6 +255,8 @@ const LessonDetailPage = () => {
                             <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: 13 }}>
                                 Tiến độ: {enrollment.progressPercent}%
                                 {enrollment.score !== null && ` • Điểm: ${enrollment.score}`}
+                                {enrollment.correctAnswers != null && (enrollment.totalQuestions != null || enrollment.total_question != null || lesson.totalQuestions > 0 || lesson.total_question > 0) &&
+                                    ` • Đúng: ${enrollment.correctAnswers}/${enrollment.totalQuestions || enrollment.total_question || lesson.totalQuestions || lesson.total_question}`}
                             </p>
                         </div>
                     </div>

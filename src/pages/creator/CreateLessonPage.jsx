@@ -27,40 +27,58 @@ const CreateLessonPage = () => {
     const [quizQuestions, setQuizQuestions] = useState([]);
 
     useEffect(() => {
-        if (isEdit) {
-            const fetchLesson = async () => {
-                const token = getToken();
-                const lessons = await learningService.getAllLessons(token);
-                const lesson = lessons.find(l => l.id === lessonId);
-                if (lesson) {
-                    setFormData({
-                        title: lesson.title,
-                        description: lesson.description,
-                        content: lesson.content || '',
-                        durationMinutes: lesson.durationMinutes,
-                        difficulty: lesson.difficulty,
-                        thumbnailUrl: lesson.thumbnailUrl || '',
-                        videoUrl: lesson.videoUrl || '',
-                        tags: lesson.tags || [],
-                        quizJson: typeof lesson.quizJson === 'object' ? JSON.stringify(lesson.quizJson) : (lesson.quizJson || '')
-                    });
+        const fetchLessonData = async () => {
+            if (!lessonId) return; // Not editing mode
+            const token = getToken();
+            try {
+                // Fetch lesson and profile in parallel
+                const [lessonData, profile] = await Promise.all([
+                    learningService.getLessonById(token, lessonId),
+                    learningService.getCreatorProfile(token).catch(() => null)
+                ]);
 
-                    // Parse quizJson to populate builder
-                    if (lesson.quizJson) {
-                        try {
-                            const parsed = typeof lesson.quizJson === 'string' ? JSON.parse(lesson.quizJson) : lesson.quizJson;
-                            if (parsed && Array.isArray(parsed.questions)) {
-                                setQuizQuestions(parsed.questions);
-                            }
-                        } catch (e) {
-                            console.error("Failed to parse quiz JSON", e);
+                // Check ownership
+                if (profile && lessonData.creatorId !== profile.id) {
+                    alert('Bạn không có quyền chỉnh sửa bài học này');
+                    navigate('/creator');
+                    return;
+                }
+
+                setFormData({
+                    title: lessonData.title,
+                    description: lessonData.description,
+                    content: lessonData.content,
+                    difficulty: lessonData.difficulty,
+                    durationMinutes: lessonData.durationMinutes,
+                    thumbnailUrl: lessonData.thumbnailUrl,
+                    videoUrl: lessonData.videoUrl,
+                    tags: lessonData.tags ? lessonData.tags.join(', ') : '',
+                });
+
+                // Parse quizJson
+                if (lessonData.quizJson) {
+                    try {
+                        const parsed = typeof lessonData.quizJson === 'string'
+                            ? JSON.parse(lessonData.quizJson)
+                            : lessonData.quizJson;
+
+                        if (parsed.questions && Array.isArray(parsed.questions)) {
+                            setQuizQuestions(parsed.questions);
+                        } else if (Array.isArray(parsed)) {
+                            setQuizQuestions(parsed);
                         }
+                    } catch (e) {
+                        console.error('Error parsing quizJson:', e);
                     }
                 }
-            };
-            fetchLesson();
-        }
-    }, [isEdit, lessonId, getToken]);
+            } catch (error) {
+                console.error('Failed to fetch lesson:', error);
+                alert('Không thể tải thông tin bài học');
+                navigate('/creator');
+            }
+        };
+        fetchLessonData();
+    }, [lessonId, getToken, navigate]);
 
     const validateForm = () => {
         if (!formData.title.trim()) {
@@ -71,7 +89,6 @@ const CreateLessonPage = () => {
             alert('Vui lòng nhập Mô tả ngắn.');
             return false;
         }
-
         if (formData.title.length > 150) {
             alert('Tiêu đề không được vượt quá 150 ký tự.');
             return false;

@@ -17,15 +17,17 @@ const QuizPage = () => {
     const [score, setScore] = useState(0);
     const [enrollmentId, setEnrollmentId] = useState(null);
     const [loading, setLoading] = useState(true);
-
     useEffect(() => {
         const fetchData = async () => {
             const token = getToken();
             if (!token) return;
 
             try {
-                // Fetch lesson by slug to get quizJson
-                const lesson = await learningService.getLessonBySlug(token, slug);
+                // Fetch lesson and enrollments in parallel
+                const [lesson, enrollments] = await Promise.all([
+                    learningService.getLessonBySlug(token, slug),
+                    learningService.getMyEnrollments(token).catch(() => [])
+                ]);
 
                 if (lesson && lesson.quizJson) {
                     // Parse quizJson if it's a string, or use directly if object
@@ -56,8 +58,7 @@ const QuizPage = () => {
                 }
 
                 // Get enrollment ID
-                const enrollments = await learningService.getMyEnrollments(token);
-                const myEnrollment = enrollments.find(e => e.lessonId === lesson.id);
+                const myEnrollment = (enrollments || []).find(e => e.lessonId === lesson.id);
                 if (myEnrollment) {
                     setEnrollmentId(myEnrollment.id);
                 }
@@ -117,7 +118,8 @@ const QuizPage = () => {
                 status: isPassed ? 'COMPLETED' : 'IN_PROGRESS',
                 progressPercent: 100, // Đã làm xong bài quiz
                 score: earnedPoints,
-                addAttempt: 1
+                addAttempt: 1,
+                correctAnswers: correctCount
             });
             console.log('Progress updated successfully!');
         } catch (error) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     Plus, Edit, Trash2, Send, TrendingUp, Filter, ArrowLeft,
-    Clock, BarChart, Tag, FileText, CheckCircle, XCircle, AlertCircle
+    Clock, BarChart, Tag, FileText, CheckCircle, XCircle, AlertCircle, Eye, X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { learningService } from '../../services/learningService';
@@ -17,6 +17,7 @@ const CreatorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [showFilter, setShowFilter] = useState(false);
+    const [selectedLesson, setSelectedLesson] = useState(null);
 
     const STATUSES = ['ALL', 'DRAFT', 'PENDING', 'APPROVED', 'REJECTED'];
 
@@ -25,24 +26,22 @@ const CreatorDashboard = () => {
             const token = getToken();
             if (!token) return;
             try {
-                // Fetch creator profile to get stats
-                const profile = await learningService.getCreatorProfile(token).catch(() => null);
-                setCreatorProfile(profile);
+                // Fetch creator profile and lessons in parallel
+                const [profile, allLessons] = await Promise.all([
+                    learningService.getCreatorProfile(token).catch(() => null),
+                    (statusFilter !== 'ALL')
+                        ? learningService.filterLessonsByStatus(token, statusFilter)
+                        : learningService.getAllLessons(token)
+                ]);
 
-                // Fetch lessons with filter
-                let allLessons;
-                if (statusFilter !== 'ALL') {
-                    allLessons = await learningService.filterLessonsByStatus(token, statusFilter);
-                } else {
-                    allLessons = await learningService.getAllLessons(token);
-                }
+                setCreatorProfile(profile);
 
                 // Filter to show only my lessons using profile ID
                 if (profile) {
-                    const myLessons = allLessons.filter(l => l.creatorId === profile.id);
+                    const myLessons = (allLessons || []).filter(l => l.creatorId === profile.id);
                     setLessons(myLessons);
                 } else {
-                    setLessons(allLessons);
+                    setLessons(allLessons || []);
                 }
             } catch (error) {
                 console.error('Error fetching lessons:', error);
@@ -113,6 +112,25 @@ const CreatorDashboard = () => {
         }
     };
 
+    const viewLessonDetail = async (lesson) => {
+        const token = getToken();
+        try {
+            // Use getLessonById or getLessonBySlug depending on what's available/preferred
+            // Since we have the full lesson object in the list, we might just use it directly
+            // or fetch fresh data if needed. For now, let's use the lesson object directly
+            // but if content is missing (e.g. list view optimization), fetch it.
+            if (!lesson.content) {
+                const detailedLesson = await learningService.getLessonById(token, lesson.id);
+                setSelectedLesson(detailedLesson);
+            } else {
+                setSelectedLesson(lesson);
+            }
+        } catch (err) {
+            console.error('Error fetching lesson detail:', err);
+            setSelectedLesson(lesson);
+        }
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'DRAFT': return '#9E9E9E';
@@ -142,6 +160,67 @@ const CreatorDashboard = () => {
             case 'TAX': return { bg: '#F3E5F5', color: '#7B1FA2' };
             default: return { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' };
         }
+    };
+
+    const modalStyles = {
+        modalOverlay: {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+        },
+        modalContent: {
+            backgroundColor: 'var(--surface-card)',
+            padding: '32px',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            color: 'var(--text-primary)',
+        },
+        modalHeader: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '24px',
+            borderBottom: '1px solid var(--border-subtle)',
+            paddingBottom: '16px',
+        },
+        modalTitle: {
+            fontSize: '24px',
+            fontWeight: '700',
+            margin: 0,
+        },
+        closeButton: {
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+        },
+        detailRow: {
+            marginBottom: '20px',
+        },
+        detailLabel: {
+            fontWeight: '600',
+            color: 'var(--text-secondary)',
+            fontSize: '15px',
+            marginBottom: '8px',
+            display: 'block',
+        },
+        detailValue: {
+            color: 'var(--text-primary)',
+            fontSize: '16px',
+            lineHeight: '1.6',
+        },
     };
 
     return (
@@ -460,6 +539,26 @@ const CreatorDashboard = () => {
                                                 <XCircle size={14} /> Hủy gửi
                                             </button>
                                         )}
+                                        {lesson.status === 'APPROVED' && (
+                                            <button
+                                                onClick={() => viewLessonDetail(lesson)}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: 8,
+                                                    border: '1px solid #2196F3',
+                                                    background: 'rgba(33, 150, 243, 0.1)',
+                                                    color: '#2196F3',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    fontWeight: 500,
+                                                    fontSize: 13
+                                                }}
+                                            >
+                                                <Eye size={14} /> Xem
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -467,6 +566,98 @@ const CreatorDashboard = () => {
                     )
                 )}
             </div>
+
+            {selectedLesson && (
+                <div style={modalStyles.modalOverlay} onClick={() => setSelectedLesson(null)}>
+                    <div style={modalStyles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <div style={modalStyles.modalHeader}>
+                            <div>
+                                <h2 style={modalStyles.modalTitle}>{selectedLesson.title}</h2>
+                                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                                    {new Date(selectedLesson.createdAt).toLocaleString('vi-VN')}
+                                </span>
+                            </div>
+                            <button style={modalStyles.closeButton} onClick={() => setSelectedLesson(null)}>
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div style={modalStyles.detailRow}>
+                            <span style={modalStyles.detailLabel}>Mô tả</span>
+                            <div style={modalStyles.detailValue}>{selectedLesson.description}</div>
+                        </div>
+
+                        {selectedLesson.videoUrl && (
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Video bài học</span>
+                                <div style={{ marginTop: '8px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                                    {selectedLesson.videoUrl.includes('youtube.com') || selectedLesson.videoUrl.includes('youtu.be') ? (
+                                        <iframe
+                                            width="100%"
+                                            height="400"
+                                            src={selectedLesson.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                                            title="Lesson Video"
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <video controls width="100%" style={{ display: 'block' }}>
+                                            <source src={selectedLesson.videoUrl} type="video/mp4" />
+                                            Trình duyệt của bạn không hỗ trợ thẻ video.
+                                        </video>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={modalStyles.detailRow}>
+                            <span style={modalStyles.detailLabel}>Nội dung</span>
+                            <div style={{
+                                ...modalStyles.detailValue,
+                                maxHeight: '300px',
+                                overflowY: 'auto',
+                                padding: '16px',
+                                background: 'var(--bg-secondary)',
+                                borderRadius: 8,
+                                fontSize: '15px'
+                            }}>
+                                {selectedLesson.content || 'Chưa có nội dung'}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '32px', marginBottom: '24px' }}>
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Độ khó</span>
+                                <div style={modalStyles.detailValue}>{selectedLesson.difficulty}</div>
+                            </div>
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Thời gian ước tính</span>
+                                <div style={modalStyles.detailValue}>{selectedLesson.durationMinutes} phút</div>
+                            </div>
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Trạng thái</span>
+                                <div style={modalStyles.detailValue}>{selectedLesson.status}</div>
+                            </div>
+                        </div>
+
+                        {selectedLesson.commentByMod && (
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Nhận xét từ moderator</span>
+                                <div style={{
+                                    ...modalStyles.detailValue,
+                                    padding: '16px',
+                                    background: 'rgba(244, 67, 54, 0.1)',
+                                    borderLeft: '4px solid #F44336',
+                                    borderRadius: 4
+                                }}>
+                                    {selectedLesson.commentByMod}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

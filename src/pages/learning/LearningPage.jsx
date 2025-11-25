@@ -98,15 +98,16 @@ const LearningPage = () => {
       try {
         console.log('Fetching learning data...');
 
-        // Fetch learner profile to show points and level
-        const profile = await learningService.getLearnerProfile(token).catch(() => null);
+        const [profile, lessonsDataRaw, enrollmentsData] = await Promise.all([
+          learningService.getLearnerProfile(token).catch(() => null),
+          learningService.getAllLessons(token),
+          learningService.getMyEnrollments(token).catch(() => [])
+        ]);
+
         setLearnerProfile(profile);
 
-        // Fetch all lessons
-        let lessonsData = await learningService.getAllLessons(token);
-
         // Filter to show only APPROVED lessons for learners
-        lessonsData = lessonsData.filter(l => l.status === 'APPROVED');
+        let lessonsData = (lessonsDataRaw || []).filter(l => l.status === 'APPROVED');
 
         // Apply tag filter (client-side for multi-select)
         if (selectedTags.length > 0 && selectedTags.length < TAGS.length) {
@@ -120,18 +121,15 @@ const LearningPage = () => {
           lessonsData = lessonsData.filter(l => l.difficulty === filterDifficulty);
         }
 
-        // Fetch enrollments and merge with lessons
-        const enrollmentsData = await learningService.getMyEnrollments(token).catch(() => []);
-
         console.log('Lessons fetched:', lessonsData);
         console.log('Enrollments fetched:', enrollmentsData);
 
-        const merged = (lessonsData || []).map((lesson) => {
+        const merged = lessonsData.map((lesson) => {
           const enrollment = (enrollmentsData || []).find((e) => e.lessonId === lesson.id);
 
-          // Count questions
-          let questionCount = 0;
-          if (lesson.quizJson) {
+          // Use totalQuestions from API or fallback to parsing quizJson
+          let questionCount = lesson.totalQuestions || lesson.total_question || 0;
+          if (questionCount === 0 && lesson.quizJson) {
             try {
               const quizData = typeof lesson.quizJson === 'string'
                 ? JSON.parse(lesson.quizJson)

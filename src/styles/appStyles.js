@@ -832,66 +832,23 @@ export const styles = {
     padding: 'clamp(24px, 6vw, 64px)',
     position: 'relative',
     overflow: 'hidden',
-    isolation: 'isolate',
-    background: 'radial-gradient(circle at center, var(--login-gradient-core) 0%, var(--login-gradient-ring) 40%, var(--login-gradient-sheen) 75%, var(--surface-app) 100%)',
-    backgroundSize: '220% 220%',
-    animation: 'loginBackgroundShift 45s ease-in-out infinite',
+    // Simple static gradient - NO animations for maximum performance
+    background: 'linear-gradient(135deg, var(--surface-app) 0%, var(--login-gradient-core) 50%, var(--surface-app) 100%)',
   },
-  authBackdrop: {
-    position: 'absolute',
-    inset: '-30%',
-    background: 'radial-gradient(circle, var(--login-gradient-core) 0%, var(--login-gradient-ring) 38%, transparent 78%)',
-    filter: 'blur(140px)',
-    opacity: 0.85,
-    animation: 'loginPulse 18s ease-in-out infinite',
-    pointerEvents: 'none',
-    zIndex: 0,
-  },
-  authBackdropGlow: {
-    position: 'absolute',
-    inset: '-15%',
-    background: 'radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, transparent 60%)',
-    filter: 'blur(100px)',
-    animation: 'loginPulseReverse 24s ease-in-out infinite',
-    pointerEvents: 'none',
-    zIndex: 0,
-  },
-  authSpectrum: {
-    position: 'absolute',
-    width: '160vmax',
-    height: '160vmax',
-    background:
-      'conic-gradient(' +
-      'from var(--login-spectrum-angle), ' +
-      '#ff3366 0%, ' +
-      '#ff5e2b 8%, ' +
-      '#ffb347 16%, ' +
-      '#ffd633 24%, ' +
-      '#d4ff33 32%, ' +
-      '#79ff33 40%, ' +
-      '#33ff66 48%, ' +
-      '#33ffc4 56%, ' +
-      '#33b9ff 64%, ' +
-      '#335bff 72%, ' +
-      '#7d33ff 80%, ' +
-      '#ff33f1 90%, ' +
-      '#ff3366 100%' +
-      ')',
-    opacity: 'var(--login-spectrum-alpha)',
-    mixBlendMode: 'screen',
-    filter: 'blur(120px)',
-    animation:
-      'loginSpectrumSweep 180s linear infinite, loginSpectrumSpin 240s linear infinite, loginHueCycle 260s linear infinite',
-    pointerEvents: 'none',
-    zIndex: 0,
-  },
+  // REMOVED: authBackdrop, authBackdropGlow, authSpectrum
+  // All blur animations have been completely removed for performance
   authCard: {
-    ...frostedCard,
     width: '100%',
     maxWidth: '420px',
     padding: spacing.xl,
     position: 'relative',
-    zIndex: 1,
+    backgroundColor: palette.card,
+    border: `1px solid ${palette.border}`,
+    borderRadius: radius.lg,
+    boxShadow: 'var(--shadow-lg)',
+    // Remove frostedCard backdrop filter for performance
+    // GPU acceleration only for transform
+    transform: 'translateZ(0)',
   },
   authTitle: {
     fontSize: 'var(--font-size-xl)',
@@ -937,6 +894,8 @@ export const styles = {
     transition: `border-color ${transitions.soft}, box-shadow ${transitions.soft}`,
     outline: 'none',
     backgroundColor: 'transparent',
+    // Minimal GPU acceleration for smooth typing
+    transform: 'translateZ(0)',
   },
   authHint: {
     fontSize: 'var(--font-size-xs)',

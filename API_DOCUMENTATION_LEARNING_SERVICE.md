@@ -133,6 +133,7 @@ Retrieve the profile of the currently logged-in learner.
     "videoUrl": "https://...",
     "commentByMod": "Optional feedback from moderator",
     "quizJson": { ... },
+    "totalQuestions": 10,
     "creatorId": "uuid",
     "moderatorId": "uuid",
     "createdAt": "2024-01-01T10:00:00Z",
@@ -180,6 +181,9 @@ Retrieve the profile of the currently logged-in learner.
       }
     ]
   },
+    ]
+  },
+  "totalQuestions": 1,
   "creatorId": "uuid",
   "moderatorId": "uuid",
   "createdAt": "2024-01-01T10:00:00Z",
@@ -222,112 +226,32 @@ Retrieve the profile of the currently logged-in learner.
 
 **Response:** `200 OK` (Array of LessonRes)
 
-### 3.7 Create Lesson
-**Endpoint:** `POST /api/lessons`
+### 3.7 Update Lesson by Slug ✨ NEW
+**Endpoint:** `PUT /api/lessons/slug/{slug}`
 
+**Auth:** Required (`SCOPE_ROLE_CREATOR`) - Must be the creator of the lesson.
 
-**Note:** Updating a lesson resets its status to `DRAFT`.
+**Path Parameters:**
+- `slug`: The lesson slug.
 
-### 3.9 Submit Lesson for Review
-**Endpoint:** `PUT /api/lessons/{lessonId}/submit`
-
-**Auth:** Required (`SCOPE_ROLE_CREATOR`, must be owner)
+**Request Body:** (Same as Update Lesson)
 
 **Response:** `200 OK` (LessonRes)
 
-**Note:** Changes lesson status from `DRAFT` to `PENDING`.
+### 3.8 Submit Lesson by Slug ✨ NEW
+**Endpoint:** `PUT /api/lessons/slug/{slug}/submit`
 
-### 3.10 Delete Lesson
-**Endpoint:** `DELETE /api/lessons/{lessonId}`
+**Auth:** Required (`SCOPE_ROLE_CREATOR`)
 
-**Auth:** Required (`SCOPE_ROLE_CREATOR`, must be owner)
+**Response:** `200 OK` (LessonRes)
+
+### 3.9 Delete Lesson by Slug ✨ NEW
+**Endpoint:** `DELETE /api/lessons/slug/{slug}`
+
+**Auth:** Required (`SCOPE_ROLE_CREATOR`)
 
 **Response:** `204 No Content`
 
----
-
-## 4. Enrollment APIs (Learning Progress)
-
-### 4.1 Enroll in a Lesson
-**Endpoint:** `POST /api/enrollments`
-
-**Auth:** Required (`SCOPE_ROLE_LEARNER`)
-
-**Request Body:**
-```json
-{
-  "lessonId": "uuid (required)"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "id": "uuid",
-  "learnerId": "uuid",
-  "lessonId": "uuid",
-  "status": "IN_PROGRESS",
-  "progressPercent": 0,
-  "score": null,
-  "attempts": 0,
-  "startedAt": "2024-01-01T10:00:00",
-  "completedAt": null,
-  "lastActivityAt": "2024-01-01T10:00:00",
-  "createdAt": "2024-01-01T10:00:00",
-  "updatedAt": "2024-01-01T10:00:00"
-}
-```
-
-**Note:** If already enrolled, returns the existing enrollment.
-
-### 4.2 Get My Enrollments
-**Endpoint:** `GET /api/enrollments`
-
-**Auth:** Required (`SCOPE_ROLE_LEARNER`)
-
-**Response:** `200 OK` (Array of EnrollmentRes)
-
-### 4.3 Get Enrollment Detail
-**Endpoint:** `GET /api/enrollments/{enrollmentId}`
-
-**Auth:** Required (`SCOPE_ROLE_LEARNER`, must be owner)
-
-**Response:** `200 OK` (EnrollmentRes)
-
-### 4.4 Update Progress
-**Endpoint:** `PUT /api/enrollments/{enrollmentId}/progress`
-
-**Auth:** Required (`SCOPE_ROLE_LEARNER`, must be owner)
-
-**Request Body:**
-```json
-{
-  "status": "IN_PROGRESS | COMPLETED | DROPPED (required)",
-  "progressPercent": 100,
-  "score": 80,
-  "addAttempt": 1
-}
-```
-
-**Response:** `200 OK`
-
-**Notes:**
-- When `status` is `COMPLETED`, `progressPercent` should be 100.
-- `score` is automatically converted to learning points and added to the learner's profile.
-- Points are only added once (when transitioning to COMPLETED for the first time).
-
-### 4.5 Get My Enrollment for Lesson (by Slug) ✨ NEW
-**Endpoint:** `GET /api/enrollments/lessons/{slug}/my-enrollment`
-
-**Auth:** Required (`SCOPE_ROLE_LEARNER`)
-
-**Path Parameters:**
-- `slug`: The lesson slug (e.g., `introduction-to-budgeting`)
-
-**Response:** `200 OK`
-```json
-{
-  "id": "uuid",
   "learnerId": "uuid",
   "lessonId": "uuid",
   "status": "IN_PROGRESS",
@@ -362,7 +286,8 @@ Retrieve the profile of the currently logged-in learner.
   "status": "IN_PROGRESS | COMPLETED | DROPPED (required)",
   "progressPercent": 100,
   "score": 80,
-  "addAttempt": 1
+  "addAttempt": 1,
+  "correctAnswers": 5
 }
 ```
 
@@ -375,6 +300,9 @@ Retrieve the profile of the currently logged-in learner.
   "status": "COMPLETED",
   "progressPercent": 100,
   "score": 80,
+  "correctAnswers": 5,
+  "totalQuestions": 5,
+  "earnedExp": 50,
   "attempts": 2,
   "startedAt": "2024-01-01T10:00:00",
   "completedAt": "2024-01-01T12:00:00",
@@ -434,14 +362,14 @@ PUT /api/enrollments/lessons/introduction-to-budgeting/my-enrollment/progress
 ### 5.3 View Lesson Detail
 **Endpoint:** `GET /api/moderators/lessons/{lessonId}`
 
-**Auth:** Required (`SCOPE_ROLE_MODERATOR`)
+**Auth:** Required (`SCOPE_ROLE_MOD`)
 
 **Response:** `200 OK` (LessonRes) or `403 Forbidden` if lesson is `DRAFT`
 
 ### 5.4 Moderate Lesson (Approve/Reject)
 **Endpoint:** `POST /api/moderators/lessons/{lessonId}/decision`
 
-**Auth:** Required (`SCOPE_ROLE_MODERATOR`)
+**Auth:** Required (`SCOPE_ROLE_MOD`)
 
 **Request Body:**
 ```json
@@ -598,4 +526,3 @@ Server error.
    - Easier to share
    - Less chance of accidentally exposing sensitive IDs
    - Simpler frontend code
-
