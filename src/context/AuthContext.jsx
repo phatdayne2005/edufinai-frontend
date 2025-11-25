@@ -9,10 +9,6 @@ import React, {
 import mockData from '../data/mockData';
 import { AUTH_ENABLED } from '../constants/featureFlags';
 import * as authApi from '../services/authApi';
-import {
-  promptAndRegisterNotificationToken,
-  unregisterNotificationToken,
-} from '../firebase/firebaseMessaging';
 
 const AuthContext = createContext(null);
 const BYPASS_STORAGE_KEY = 'financeEduAuthBypass';
@@ -138,11 +134,6 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.removeItem(BYPASS_STORAGE_KEY);
 
-      try {
-        await promptAndRegisterNotificationToken(finalToken);
-      } catch (notificationError) {
-        console.warn('Không thể đăng ký thông báo:', notificationError);
-      }
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
@@ -172,8 +163,6 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', error);
       // Continue with logout even if API call fails
     } finally {
-      const jwtToken = authApi.getStoredToken();
-      await unregisterNotificationToken(jwtToken).catch(() => { });
       localStorage.removeItem(BYPASS_STORAGE_KEY);
       authApi.removeToken();
 

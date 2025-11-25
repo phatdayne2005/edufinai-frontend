@@ -26,6 +26,7 @@ const ChatBotPage = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const activeConversationRef = useRef(conversationId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,6 +35,10 @@ const ChatBotPage = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    activeConversationRef.current = conversationId;
+  }, [conversationId]);
 
   const loadConversations = async (selectLatest = false) => {
     setIsLoadingConversations(true);
@@ -149,30 +154,51 @@ const ChatBotPage = () => {
     setIsLoading(true);
     setError(null);
 
+    const targetConversationId = conversationId;
+    const isViewingOriginalConversation = () => {
+      const currentId = activeConversationRef.current;
+      if (!currentId && !targetConversationId) {
+        return true;
+      }
+      return currentId === targetConversationId;
+    };
+
     try {
+      // Send activeConversationId (the conversation user is currently viewing)
+      // This helps backend manage notifications: if activeConversationId != conversationId,
+      // backend will send notification; otherwise, no notification (user is viewing)
       const response = await askQuestion({
         question,
         conversationId,
+        activeConversationId: conversationId, // User is viewing this conversation
       });
 
-      const botMessage = {
-        id: `bot-${Date.now()}`,
-        type: 'bot',
-        content: buildFullContent(response),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botMessage]);
-      setConversationId(response.conversationId || conversationId);
+      if (isViewingOriginalConversation()) {
+        const botMessage = {
+          id: `bot-${Date.now()}`,
+          type: 'bot',
+          content: buildFullContent(response),
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+        setConversationId(response.conversationId || conversationId);
+      } else {
+        console.info('[Chat] Response received for a different conversation. Skipping UI update.');
+      }
       loadConversations();
     } catch (err) {
-      const errorMessage = {
-        id: `error-${Date.now()}`,
-        type: 'error',
-        content: err.message || 'Không thể kết nối tới AI. Vui lòng thử lại.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setError(err.message);
+      if (isViewingOriginalConversation()) {
+        const errorMessage = {
+          id: `error-${Date.now()}`,
+          type: 'error',
+          content: err.message || 'Không thể kết nối tới AI. Vui lòng thử lại.',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setError(err.message);
+      } else {
+        console.error('[Chat] Error returned for non-active conversation:', err);
+      }
     } finally {
       setIsLoading(false);
     }

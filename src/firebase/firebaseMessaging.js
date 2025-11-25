@@ -1,3 +1,5 @@
+/* global globalThis */
+
 import { initializeApp } from 'firebase/app';
 import {
     getMessaging,
@@ -6,7 +8,7 @@ import {
     deleteToken as firebaseDeleteToken,
     isSupported,
 } from 'firebase/messaging';
-import firebaseConfig, { hasFirebaseEnvConfig } from './firebaseConfig';
+import firebaseConfig, { hasFirebaseConfig } from './firebaseConfig';
 import { registerDeviceToken, unregisterDeviceToken } from '../services/notificationApi';
 
 const FCM_TOKEN_STORAGE_KEY = 'edufinai_fcm_token';
@@ -26,7 +28,7 @@ const initFirebaseApp = () => {
         firebaseApp = initializeApp(firebaseConfig);
         logFCM('Firebase app initialized', {
             projectId: firebaseConfig.projectId,
-            hasEnvConfig: hasFirebaseEnvConfig,
+            hasConfig: hasFirebaseConfig,
         });
     }
     return firebaseApp;
@@ -104,9 +106,13 @@ const retrieveFcmToken = async () => {
 
     await registerServiceWorker();
 
-    const vapidKey = process.env.REACT_APP_FIREBASE_VAPID_KEY;
+    const vapidKey =
+        process.env.REACT_APP_FIREBASE_VAPID_KEY ||
+        (typeof globalThis !== 'undefined' ? globalThis.__FIREBASE_VAPID_KEY : null);
     if (!vapidKey) {
-        console.warn('Missing REACT_APP_FIREBASE_VAPID_KEY environment variable.');
+        console.warn(
+            'Missing VAPID key. Set REACT_APP_FIREBASE_VAPID_KEY or self.__FIREBASE_VAPID_KEY in public/firebase-config.js.'
+        );
     }
 
     const token = await getToken(messaging, {

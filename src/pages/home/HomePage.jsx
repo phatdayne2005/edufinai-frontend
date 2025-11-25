@@ -71,7 +71,14 @@ const HomePage = () => {
       const report = await getDailyReport();
       setDailyReport(report);
     } catch (error) {
-      setReportError(error.message || 'Không thể tải báo cáo');
+      // Error 401 (unauthorized) is handled by aiService (redirects to login)
+      // For other errors, show error message
+      if (error.message?.includes('401') || error.message?.includes('hết hạn')) {
+        setReportError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        // Redirect will be handled by aiService
+      } else {
+        setReportError(error.message || 'Không thể tải báo cáo');
+      }
       setDailyReport(null);
     } finally {
       setIsLoadingReport(false);
@@ -390,25 +397,49 @@ const HomePage = () => {
                       Thử lại
                     </button>
                   </div>
-                ) : dailyReport ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-sm text-text-secondary leading-relaxed">
-                      {dailyReport.insight || 'Chưa có insight cho hôm nay.'}
-                    </p>
-                    {dailyReport.rootCause && (
-                      <div className="text-sm text-text-secondary bg-white/50 dark:bg-black/20 p-2 rounded border border-indigo-100 dark:border-indigo-900/30">
-                        <span className="font-semibold text-indigo-700 dark:text-indigo-300">Lý do: </span>
-                        {dailyReport.rootCause}
-                      </div>
-                    )}
-                    {dailyReport.priorityAction && (
-                      <div className="flex items-center gap-2 text-sm font-medium text-primary mt-2">
-                        <Target size={14} />
-                        <span>Ưu tiên: {dailyReport.priorityAction}</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
+                ) : dailyReport ? (() => {
+                  // Simple check: if fields are null/empty/undefined, treat as no data
+                  // Backend should return null/empty when there's no data, not error messages
+                  const insight = dailyReport.insight?.trim();
+                  const rootCause = dailyReport.rootCause?.trim();
+                  const priorityAction = dailyReport.priorityAction?.trim();
+                  
+                  const hasInsight = insight && insight.length > 0;
+                  const hasRootCause = rootCause && rootCause.length > 0;
+                  const hasPriorityAction = priorityAction && priorityAction.length > 0;
+
+                  // If all fields are empty/null, show fallback message
+                  if (!hasInsight && !hasRootCause && !hasPriorityAction) {
+                    return (
+                      <p className="mt-3 text-sm text-text-muted italic">
+                        Chưa đủ dữ liệu để tạo báo cáo. Vui lòng cập nhật dữ liệu.
+                      </p>
+                    );
+                  }
+
+                  // Show report with available data
+                  return (
+                    <div className="mt-3 space-y-2">
+                      {hasInsight && (
+                        <p className="text-sm text-text-secondary leading-relaxed">
+                          {insight}
+                        </p>
+                      )}
+                      {hasRootCause && (
+                        <div className="text-sm text-text-secondary bg-white/50 dark:bg-black/20 p-2 rounded border border-indigo-100 dark:border-indigo-900/30">
+                          <span className="font-semibold text-indigo-700 dark:text-indigo-300">Lý do: </span>
+                          {rootCause}
+                        </div>
+                      )}
+                      {hasPriorityAction && (
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary mt-2">
+                          <Target size={14} />
+                          <span>Ưu tiên: {priorityAction}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : (
                   <p className="mt-3 text-sm text-text-muted italic">
                     Chưa có dữ liệu để tạo báo cáo hôm nay. Hãy thêm giao dịch mới.
                   </p>

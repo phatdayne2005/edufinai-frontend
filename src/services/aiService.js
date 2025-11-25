@@ -42,6 +42,19 @@ const parseResponseBody = async (response) => {
 };
 
 const handleResponse = async (response) => {
+  // Handle 401 Unauthorized - Token expired or invalid
+  if (response.status === 401) {
+    // Remove token from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(JWT_TOKEN_KEY);
+    }
+    // Redirect to login
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+  }
+
   const data = await parseResponseBody(response);
 
   if (!response.ok) {
@@ -77,8 +90,14 @@ const apiRequest = async (endpoint, options = {}) => {
 
 /**
  * Ask the AI advisor a question or trigger a widget context
+ * @param {Object} params - Request parameters
+ * @param {string} [params.question] - User's question
+ * @param {string} [params.conversationId] - ID of conversation to continue
+ * @param {string} [params.context] - Context preset (SPENDING_WIDGET, SAVING_WIDGET, GOAL_WIDGET)
+ * @param {string} [params.activeConversationId] - ID of conversation user is currently viewing (for notification management)
+ * @returns {Promise<Object>} AI response with answer, tips, disclaimers, etc.
  */
-export const askQuestion = async ({ question, conversationId, context } = {}) => {
+export const askQuestion = async ({ question, conversationId, context, activeConversationId } = {}) => {
   const payload = {};
 
   if (conversationId) {
@@ -91,6 +110,10 @@ export const askQuestion = async ({ question, conversationId, context } = {}) =>
 
   if (question) {
     payload.question = question.trim();
+  }
+
+  if (activeConversationId) {
+    payload.activeConversationId = activeConversationId;
   }
 
   if (!payload.question && !payload.context) {

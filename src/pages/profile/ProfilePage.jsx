@@ -1,42 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, ChevronRight, Loader2, RefreshCw, AlertCircle, Award, Trophy } from 'lucide-react';
+import { ChevronRight, Loader2, Award, Trophy } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
 import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
-import { askQuestion } from '../../services/aiService';
 import { getMyBadges, getUserRewards } from '../../services/gamificationApi';
 import { formatDateTime } from '../../utils/formatters';
+import AIWidgetCard from '../../components/ai/AIWidgetCard';
 
 const menuItems = [
   { icon: '🔔', label: 'Thông báo' },
   { icon: '🔒', label: 'Bảo mật' },
   { icon: '❓', label: 'Trợ giúp' },
-];
-
-const widgetConfigs = [
-  {
-    key: 'spending',
-    title: '📊 Phân tích chi tiêu',
-    context: 'SPENDING_WIDGET',
-    conversationId: 'advisor-spending',
-    description: 'Phân tích khoản chi nổi bật 7 ngày gần nhất.',
-  },
-  {
-    key: 'saving',
-    title: '💰 Gợi ý tiết kiệm',
-    context: 'SAVING_WIDGET',
-    conversationId: 'advisor-saving',
-    description: 'Tiến độ tiết kiệm và đề xuất đóng góp tiếp theo.',
-  },
-  {
-    key: 'goal',
-    title: '🎯 Mục tiêu tiếp theo',
-    context: 'GOAL_WIDGET',
-    conversationId: 'advisor-goal',
-    description: 'Mục tiêu tài chính cần ưu tiên cùng % hoàn thành.',
-  },
 ];
 
 // Helper function để get badge type label và color
@@ -50,20 +26,9 @@ const getBadgeTypeInfo = (badgeType) => {
   };
   return typeMap[badgeType] || { label: badgeType || 'Không xác định', color: '#666', bg: 'rgba(0, 0, 0, 0.05)' };
 };
-
 const ProfilePage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [widgets, setWidgets] = useState(() =>
-    widgetConfigs.map((config) => ({
-      ...config,
-      loading: true,
-      error: null,
-      answer: '',
-      tips: [],
-      disclaimers: [],
-    }))
-  );
   const [badges, setBadges] = useState([]);
   const [rewards, setRewards] = useState(null);
   const [badgesLoading, setBadgesLoading] = useState(true);
@@ -76,52 +41,6 @@ const ProfilePage = () => {
     } catch (error) {
       console.error('Logout failed:', error);
       navigate('/auth/login', { replace: true });
-    }
-  };
-
-  const fetchWidget = async (key) => {
-    setWidgets((prev) =>
-      prev.map((widget) =>
-        widget.key === key
-          ? { ...widget, loading: true, error: null }
-          : widget
-      )
-    );
-
-    const config = widgetConfigs.find((item) => item.key === key);
-    if (!config) return;
-
-    try {
-      const response = await askQuestion({
-        conversationId: config.conversationId,
-        context: config.context,
-      });
-
-      setWidgets((prev) =>
-        prev.map((widget) =>
-          widget.key === key
-            ? {
-                ...widget,
-                loading: false,
-                answer: response.answer || 'Chưa có dữ liệu để phân tích.',
-                tips: response.tips || [],
-                disclaimers: response.disclaimers || [],
-              }
-            : widget
-        )
-      );
-    } catch (error) {
-      setWidgets((prev) =>
-        prev.map((widget) =>
-          widget.key === key
-            ? {
-                ...widget,
-                loading: false,
-                error: error.message || 'Không thể tải dữ liệu AI',
-              }
-            : widget
-        )
-      );
     }
   };
 
@@ -152,7 +71,6 @@ const ProfilePage = () => {
   };
 
   useEffect(() => {
-    widgetConfigs.forEach((config) => fetchWidget(config.key));
     fetchGamificationData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -422,66 +340,26 @@ const ProfilePage = () => {
         </div>
       )}
 
+      {/* AI Advisory Widgets */}
       <div style={styles.section}>
-        <div style={styles.sectionHeader}>
-          <Brain size={24} color="#4CAF50" />
-          <h3 style={styles.sectionTitle}>Tư vấn AI</h3>
+        <h3 style={styles.sectionTitle}>Tư vấn AI</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <AIWidgetCard
+            title="Phân tích chi tiêu"
+            description="Phân tích khoản chi nổi bật 7 ngày gần nhất."
+            context="SPENDING_WIDGET"
+          />
+          <AIWidgetCard
+            title="Gợi ý tiết kiệm"
+            description="Tiến độ tiết kiệm và đề xuất đóng góp tiếp theo."
+            context="SAVING_WIDGET"
+          />
+          <AIWidgetCard
+            title="Mục tiêu tiếp theo"
+            description="Mục tiêu tài chính cần ưu tiên cùng % hoàn thành."
+            context="GOAL_WIDGET"
+          />
         </div>
-        {widgets.map((widget) => (
-          <div key={widget.key} style={styles.aiCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p style={styles.aiCardTitle}>{widget.title}</p>
-              <button
-                type="button"
-                onClick={() => fetchWidget(widget.key)}
-                disabled={widget.loading}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: widget.loading ? 'not-allowed' : 'pointer',
-                  color: '#4CAF50',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-                title="Làm mới"
-              >
-                {widget.loading ? (
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <RefreshCw size={16} />
-                )}
-              </button>
-            </div>
-            <p style={{ ...styles.aiCardText, color: '#757575', fontSize: '12px', marginTop: 0 }}>
-              {widget.description}
-            </p>
-            {widget.error ? (
-              <div style={{ color: '#F44336', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertCircle size={16} />
-                <span>{widget.error}</span>
-              </div>
-            ) : widget.loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#666' }}>
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Đang lấy dữ liệu từ AI...</span>
-              </div>
-            ) : (
-              <>
-                <p style={styles.aiCardText}>{widget.answer}</p>
-                {widget.tips && widget.tips.length > 0 && (
-                  <ul style={{ margin: '8px 0 0 16px', color: '#4CAF50', fontSize: '13px' }}>
-                    {widget.tips.map((tip, index) => (
-                      <li key={index}>{tip}</li>
-                    ))}
-                  </ul>
-                )}
-                {widget.disclaimers && widget.disclaimers.length > 0 && (
-                  <p style={{ marginTop: 10, fontSize: '12px', color: '#999' }}>⚠️ {widget.disclaimers[0]}</p>
-                )}
-              </>
-            )}
-          </div>
-        ))}
       </div>
 
       {/* Theme Customizer */}

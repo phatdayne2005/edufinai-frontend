@@ -20,10 +20,22 @@ const firebaseConfig = {
     measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || fallbackConfig.measurementId,
 };
 
-export const hasFirebaseEnvConfig =
-    Object.values(firebaseConfig).every(Boolean) && !!process.env.REACT_APP_FIREBASE_VAPID_KEY;
+const globalFirebaseConfig =
+    typeof globalThis !== 'undefined' && globalThis.__FIREBASE_CONFIG
+        ? globalThis.__FIREBASE_CONFIG
+        : null;
 
-if (process.env.NODE_ENV !== 'production' && !hasFirebaseEnvConfig) {
+const firebaseConfig = globalFirebaseConfig || envFirebaseConfig;
+
+export const hasFirebaseEnvConfig =
+    Object.values(envFirebaseConfig).every(Boolean) && !!process.env.REACT_APP_FIREBASE_VAPID_KEY;
+
+export const hasFirebaseGlobalConfig =
+    !!globalFirebaseConfig && Object.values(globalFirebaseConfig).every(Boolean);
+
+export const hasFirebaseConfig = hasFirebaseEnvConfig || hasFirebaseGlobalConfig;
+
+if (process.env.NODE_ENV !== 'production' && !hasFirebaseConfig) {
     // eslint-disable-next-line no-console
     console.warn(
         '[Firebase] Missing configuration in environment variables. Using fallback config from firebase-config.js'
