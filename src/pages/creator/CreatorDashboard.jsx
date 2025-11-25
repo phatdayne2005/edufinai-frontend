@@ -8,6 +8,7 @@ import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
 import Header from '../../components/layout/Header';
+import CreatorChallengeManager from '../../components/challenges/CreatorChallengeManager';
 
 const CreatorDashboard = () => {
     const navigate = useNavigate();
@@ -224,6 +225,7 @@ const CreatorDashboard = () => {
     };
 
     return (
+        <>
         <div style={styles.page}>
             <button
                 onClick={() => navigate(-1)}
@@ -659,6 +661,11 @@ const CreatorDashboard = () => {
                 </div>
             )}
         </div>
+
+        <div style={{ marginTop: 32 }}>
+            <CreatorChallengeManager />
+        </div>
+        </>
     );
 };
 

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, CheckCircle, XCircle, Loader2, Eye, X, Clock, BarChart, Tag, User, Circle, AlertCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Shield, CheckCircle, XCircle, Loader2, Eye, X, Clock, BarChart, Tag, User, Circle, AlertCircle, AlertTriangle, HelpCircle, RefreshCw, Target, Gift, CalendarDays } from 'lucide-react';
 import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
+import { getChallengesByStatus, updateChallengeApproval } from '../../services/gamificationApi';
 
 const ModDashboard = () => {
   const navigate = useNavigate();
@@ -13,6 +14,9 @@ const ModDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [counts, setCounts] = useState({ PENDING: 0, APPROVED: 0, REJECTED: 0 });
   const [creatorNames, setCreatorNames] = useState({});
+  const [pendingChallenges, setPendingChallenges] = useState([]);
+  const [challengeLoading, setChallengeLoading] = useState(true);
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
 
   const STATUSES = ['PENDING', 'APPROVED', 'REJECTED'];
 
@@ -51,6 +55,20 @@ const ModDashboard = () => {
     }
   };
 
+  const fetchPendingChallenges = async () => {
+    try {
+      setChallengeLoading(true);
+      const data = await getChallengesByStatus('PENDING');
+      const normalized = Array.isArray(data) ? data : data?.result || [];
+      setPendingChallenges(normalized);
+    } catch (error) {
+      console.error('Error fetching pending challenges:', error);
+      setPendingChallenges([]);
+    } finally {
+      setChallengeLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchLessons();
   }, [statusFilter, getToken]);
@@ -58,6 +76,10 @@ const ModDashboard = () => {
   useEffect(() => {
     fetchCounts();
   }, [getToken, lessons]);
+
+  useEffect(() => {
+    fetchPendingChallenges();
+  }, []);
 
   // Fetch creator names
   useEffect(() => {
@@ -195,6 +217,56 @@ const ModDashboard = () => {
           icon: <Circle size={14} color="#666" />,
           text: difficulty
         };
+    }
+  };
+
+  const parseRule = (rule) => {
+    if (!rule) return {};
+    if (typeof rule === 'object') return rule;
+    try {
+      return JSON.parse(rule);
+    } catch (error) {
+      console.warn('Failed to parse challenge rule', error);
+      return {};
+    }
+  };
+
+  const getChallengeId = (challenge) => challenge?.id || challenge?.challengeId;
+
+  const formatDateDisplay = (value, withTime = false) => {
+    if (!value) return 'Không rõ';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Không rõ';
+    return withTime ? date.toLocaleString('vi-VN') : date.toLocaleDateString('vi-VN');
+  };
+
+  const handleChallengeModerate = async (challenge, status) => {
+    const challengeId = getChallengeId(challenge);
+    if (!challengeId) return;
+
+    if (status === 'REJECTED') {
+      const note = prompt('Nhập lý do từ chối thử thách:');
+      if (!note) return;
+      try {
+        await updateChallengeApproval(challengeId, { status, note });
+        alert('Đã từ chối thử thách');
+        setSelectedChallenge(null);
+        fetchPendingChallenges();
+      } catch (error) {
+        console.error('Reject challenge failed', error);
+        alert(error.message || 'Không thể từ chối thử thách');
+      }
+    } else {
+      if (!window.confirm('Bạn có chắc chắn muốn duyệt thử thách này?')) return;
+      try {
+        await updateChallengeApproval(challengeId, { status });
+        alert('Đã duyệt thử thách');
+        setSelectedChallenge(null);
+        fetchPendingChallenges();
+      } catch (error) {
+        console.error('Approve challenge failed', error);
+        alert(error.message || 'Không thể duyệt thử thách');
+      }
     }
   };
 
@@ -427,6 +499,39 @@ const ModDashboard = () => {
       resize: 'vertical',
       marginBottom: '16px',
       fontFamily: 'inherit'
+    },
+    challengeSection: {
+      marginTop: '48px',
+    },
+    challengeCard: {
+      backgroundColor: 'var(--surface-card)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '12px',
+      padding: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+    },
+    challengeMeta: {
+      fontSize: '13px',
+      color: 'var(--text-muted)',
+      display: 'flex',
+      gap: '12px',
+      flexWrap: 'wrap',
+    },
+    challengeActions: {
+      display: 'flex',
+      gap: '8px',
+      flexWrap: 'wrap',
+      marginTop: '12px',
+    },
+    challengePill: {
+      padding: '4px 10px',
+      borderRadius: '999px',
+      fontSize: '12px',
+      fontWeight: 600,
+      backgroundColor: 'rgba(248, 191, 38, 0.15)',
+      color: '#B45309',
     }
   };
 
@@ -757,6 +862,183 @@ const ModDashboard = () => {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Challenge Moderation Section */}
+      <div style={styles.challengeSection}>
+        <h2 style={styles.sectionTitle}>
+          Thử thách chờ duyệt ({pendingChallenges.length})
+        </h2>
+        {challengeLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+            <Loader2 className="animate-spin" />
+          </div>
+        ) : pendingChallenges.length > 0 ? (
+          <div style={styles.lessonList}>
+            {pendingChallenges.map((challenge) => {
+              const rule = parseRule(challenge.rule);
+              return (
+                <div key={getChallengeId(challenge)} style={styles.challengeCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={styles.lessonTitle}>{challenge.title}</h3>
+                      <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                        {challenge.description}
+                      </p>
+                      <div style={styles.challengeMeta}>
+                        <div style={styles.metaItem}>
+                          <Target size={14} />
+                          <span>{challenge.type || 'N/A'}</span>
+                        </div>
+                        <div style={styles.metaItem}>
+                          <Gift size={14} />
+                          <span>{challenge.rewardScore || 0} điểm</span>
+                            {challenge.rewardBadgeCode && (
+                              <span style={styles.challengePill}>{challenge.rewardBadgeCode}</span>
+                            )}
+                        </div>
+                        <div style={styles.metaItem}>
+                          <CalendarDays size={14} />
+                          <span>
+                            {formatDateDisplay(challenge.startAt)} - {formatDateDisplay(challenge.endAt)}
+                          </span>
+                        </div>
+                        {rule.targetValue && (
+                          <div style={styles.metaItem}>
+                            <span>Mục tiêu: {rule.targetValue}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={styles.challengeActions}>
+                      <button
+                        style={styles.btnDetail}
+                        onClick={() => setSelectedChallenge(challenge)}
+                        title="Xem chi tiết"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        style={styles.btnApprove}
+                        onClick={() => handleChallengeModerate(challenge, 'APPROVED')}
+                      >
+                        <CheckCircle size={16} /> Duyệt
+                      </button>
+                      <button
+                        style={styles.btnReject}
+                        onClick={() => handleChallengeModerate(challenge, 'REJECTED')}
+                      >
+                        <XCircle size={16} /> Từ chối
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            Không có thử thách nào chờ duyệt.
+          </div>
+        )}
+      </div>
+
+      {/* Challenge Detail Modal */}
+      {selectedChallenge && (
+        <div style={styles.modalOverlay} onClick={() => setSelectedChallenge(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div>
+                <h2 style={styles.modalTitle}>{selectedChallenge.title}</h2>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                  Tạo lúc: {formatDateDisplay(selectedChallenge.createdAt, true)}
+                </span>
+              </div>
+              <button style={styles.closeButton} onClick={() => setSelectedChallenge(null)}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Mô tả</span>
+              <div style={styles.detailValue}>{selectedChallenge.description}</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '32px', marginBottom: '24px' }}>
+              <div style={styles.detailRow}>
+                <span style={styles.detailLabel}>Loại</span>
+                <div style={styles.detailValue}>{selectedChallenge.type || 'N/A'}</div>
+              </div>
+              <div style={styles.detailRow}>
+                <span style={styles.detailLabel}>Phạm vi</span>
+                <div style={styles.detailValue}>{selectedChallenge.scope || 'N/A'}</div>
+              </div>
+              <div style={styles.detailRow}>
+                <span style={styles.detailLabel}>Trạng thái</span>
+                <div style={styles.detailValue}>{selectedChallenge.status || 'PENDING'}</div>
+              </div>
+            </div>
+
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Thời gian</span>
+              <div style={styles.detailValue}>
+                Bắt đầu: {formatDateDisplay(selectedChallenge.startAt, true)}<br />
+                Kết thúc: {formatDateDisplay(selectedChallenge.endAt, true)}
+              </div>
+            </div>
+
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Phần thưởng</span>
+              <div style={styles.detailValue}>
+                Điểm: {selectedChallenge.rewardScore || 0}
+                {selectedChallenge.rewardBadgeCode && (
+                  <span style={{ ...styles.challengePill, marginLeft: '8px' }}>
+                    {selectedChallenge.rewardBadgeCode}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {selectedChallenge.rule && (
+              <div style={styles.detailRow}>
+                <span style={styles.detailLabel}>Quy tắc</span>
+                <div style={{
+                  ...styles.detailValue,
+                  padding: '16px',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 8,
+                  fontSize: '14px',
+                  fontFamily: 'monospace'
+                }}>
+                  {JSON.stringify(parseRule(selectedChallenge.rule), null, 2)}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: '32px', borderTop: '1px solid var(--border-subtle)', paddingTop: '24px' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  style={styles.btnReject}
+                  onClick={() => {
+                    setSelectedChallenge(null);
+                    handleChallengeModerate(selectedChallenge, 'REJECTED');
+                  }}
+                >
+                  <XCircle size={16} /> Từ chối
+                </button>
+                <button
+                  style={styles.btnApprove}
+                  onClick={() => {
+                    setSelectedChallenge(null);
+                    handleChallengeModerate(selectedChallenge, 'APPROVED');
+                  }}
+                >
+                  <CheckCircle size={16} /> Duyệt thử thách
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

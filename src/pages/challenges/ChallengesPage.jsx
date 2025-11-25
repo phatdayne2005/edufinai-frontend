@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Trophy, Award, RefreshCw } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
@@ -20,6 +20,64 @@ const LEADERBOARD_TYPES = [
   { value: 'ALLTIME', label: '🏆 Tất cả thời gian' },
 ];
 
+const PERIOD_LABELS = {
+  DAILY: '📅 Hằng ngày',
+  WEEKLY: '📆 Hằng tuần',
+  MONTHLY: '📊 Hằng tháng',
+};
+
+const normalizeChallengeId = (challenge) => challenge?.challengeId || challenge?.id;
+
+const getDeadlineLabel = (challenge) => {
+  if (!challenge) return 'Không xác định';
+  if (challenge.scope && PERIOD_LABELS[challenge.scope]) {
+    return PERIOD_LABELS[challenge.scope];
+  }
+
+  if (challenge.endAt) {
+    const end = new Date(challenge.endAt);
+    if (!Number.isNaN(end.getTime())) {
+      const diffDays = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) return `⏳ Còn ${diffDays} ngày`;
+      if (diffDays === 0) return '⏳ Còn chưa tới 1 ngày';
+      return '❌ Đã kết thúc';
+    }
+  }
+
+  return 'Không giới hạn';
+};
+
+const getSortKey = (challenge, { completed } = {}) => {
+  if (!challenge) return Number.MAX_SAFE_INTEGER;
+  if (completed) return Number.MAX_SAFE_INTEGER - 100; // Completed luôn ở cuối
+
+  if (challenge.scope && PERIOD_LABELS[challenge.scope]) {
+    // Chu kỳ reset không có hạn, để sau cùng nhưng vẫn ưu tiên theo chu kỳ
+    const priority = { DAILY: 3, WEEKLY: 2, MONTHLY: 1 }[challenge.scope] || 0;
+    return Number.MAX_SAFE_INTEGER - priority;
+  }
+
+  if (challenge.endAt) {
+    const end = new Date(challenge.endAt).getTime();
+    if (!Number.isNaN(end)) return end;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+};
+
+const isCurrentlyActiveChallenge = (challenge) => {
+  if (!challenge) return false;
+  if (challenge.active === false) return false;
+
+  const now = Date.now();
+  const start = challenge.startAt ? new Date(challenge.startAt).getTime() : null;
+  const end = challenge.endAt ? new Date(challenge.endAt).getTime() : null;
+
+  if (start && now < start) return false;
+  if (end && now > end) return false;
+  return true;
+};
+
 const ChallengesPage = () => {
   const { user: mockUser } = useApp();
   const { user: authUser, getToken } = useAuth();
@@ -33,6 +91,8 @@ const ChallengesPage = () => {
   const [activeChallenges, setActiveChallenges] = useState([]);
   const [completedChallenges, setCompletedChallenges] = useState([]);
   const [challengesLoading, setChallengesLoading] = useState(true);
+  const [allChallenges, setAllChallenges] = useState([]);
+  const [challengeView, setChallengeView] = useState('NO_PROGRESS'); // NO_PROGRESS | WITH_PROGRESS
 
   // Get current user ID from JWT token
   useEffect(() => {
@@ -115,16 +175,19 @@ const ChallengesPage = () => {
   const fetchChallenges = async () => {
     try {
       setChallengesLoading(true);
-      const [activeData, completedData] = await Promise.all([
+      const [allData, activeData, completedData] = await Promise.all([
+        getChallenges().catch(() => []),
         getActiveChallenges().catch(() => ({ code: 200, result: [], message: '' })),
         getCompletedChallenges().catch(() => ({ code: 200, result: [], message: '' })),
       ]);
 
-      // Handle response structure: { code, result[], message }
+      const normalizedAll = Array.isArray(allData) ? allData : allData?.result || [];
+      setAllChallenges(normalizedAll);
       setActiveChallenges(activeData?.result || []);
       setCompletedChallenges(completedData?.result || []);
     } catch (err) {
       console.error('Error fetching challenges:', err);
+      setAllChallenges([]);
       setActiveChallenges([]);
       setCompletedChallenges([]);
     } finally {
@@ -143,6 +206,78 @@ const ChallengesPage = () => {
   const handleRefresh = () => {
     fetchLeaderboard(selectedType, false);
   };
+
+  const challengeDefinitionsMap = useMemo(() => {
+    const map = new Map();
+    allChallenges.forEach((challenge) => {
+      const id = normalizeChallengeId(challenge);
+      if (id) map.set(String(id), challenge);
+    });
+    return map;
+  }, [allChallenges]);
+
+  const progressMap = useMemo(() => {
+    const map = new Map();
+    activeChallenges.forEach((challenge) => {
+      if (challenge.challengeId) {
+        map.set(String(challenge.challengeId), { ...challenge, status: 'ACTIVE' });
+      }
+    });
+    completedChallenges.forEach((challenge) => {
+      if (challenge.challengeId) {
+        map.set(String(challenge.challengeId), { ...challenge, status: 'COMPLETED' });
+      }
+    });
+    return map;
+  }, [activeChallenges, completedChallenges]);
+
+  const challengesWithProgress = useMemo(() => {
+    const list = [];
+    progressMap.forEach((progress, key) => {
+      const definition = challengeDefinitionsMap.get(key);
+      const merged = {
+        id: key,
+        title: definition?.title || progress.title || 'Chưa rõ tên',
+        description: definition?.description || progress.description || '',
+        rewardScore: definition?.rewardScore ?? progress.rewardScore ?? 0,
+        scope: definition?.scope || progress.scope,
+        endAt: definition?.endAt || progress.endAt,
+        currentProgress: progress.currentProgress || 0,
+        targetProgress: progress.targetProgress || 0,
+        status: progress.status,
+        completedAt: progress.completedAt,
+      };
+      list.push({
+        ...merged,
+        deadlineLabel: getDeadlineLabel(definition || progress),
+        sortKey: getSortKey(definition || progress, { completed: progress.status === 'COMPLETED' }),
+      });
+    });
+    return list.sort((a, b) => a.sortKey - b.sortKey);
+  }, [progressMap, challengeDefinitionsMap]);
+
+  const challengesWithoutProgress = useMemo(() => {
+    const list = allChallenges
+      .filter((challenge) => {
+        const id = normalizeChallengeId(challenge);
+        if (!id) return false;
+        if (progressMap.has(String(id))) return false;
+        return isCurrentlyActiveChallenge(challenge);
+      })
+      .map((challenge) => ({
+        id: normalizeChallengeId(challenge),
+        title: challenge.title,
+        description: challenge.description,
+        rewardScore: challenge.rewardScore || 0,
+        scope: challenge.scope,
+        endAt: challenge.endAt,
+        deadlineLabel: getDeadlineLabel(challenge),
+        sortKey: getSortKey(challenge),
+      }))
+      .sort((a, b) => a.sortKey - b.sortKey);
+
+    return list;
+  }, [allChallenges, progressMap]);
 
   // Get user stats from my position or fallback to mock data
   // myPosition structure: { name, score, top }
@@ -186,32 +321,116 @@ const ChallengesPage = () => {
 
       <div style={styles.section}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={styles.sectionTitle}>Thử thách đang thực hiện</h3>
+          <h3 style={styles.sectionTitle}>Thử thách</h3>
           {challengesLoading && (
             <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
           )}
         </div>
-        
+
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setChallengeView('NO_PROGRESS')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '999px',
+              border: challengeView === 'NO_PROGRESS' ? '2px solid #2563eb' : '1px solid var(--border-subtle)',
+              background: challengeView === 'NO_PROGRESS' ? 'rgba(37, 99, 235, 0.08)' : 'var(--surface-muted)',
+              color: challengeView === 'NO_PROGRESS' ? '#1d4ed8' : 'var(--text-primary)',
+              fontWeight: challengeView === 'NO_PROGRESS' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            🔓 Chưa tham gia ({challengesWithoutProgress.length})
+          </button>
+          <button
+            onClick={() => setChallengeView('WITH_PROGRESS')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '999px',
+              border: challengeView === 'WITH_PROGRESS' ? '2px solid #059669' : '1px solid var(--border-subtle)',
+              background: challengeView === 'WITH_PROGRESS' ? 'rgba(5, 150, 105, 0.08)' : 'var(--surface-muted)',
+              color: challengeView === 'WITH_PROGRESS' ? '#047857' : 'var(--text-primary)',
+              fontWeight: challengeView === 'WITH_PROGRESS' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            🚀 Đang/đã tham gia ({challengesWithProgress.length})
+          </button>
+        </div>
+
         {challengesLoading ? (
           <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
             <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: '8px' }} />
             <p>Đang tải thử thách...</p>
           </div>
-        ) : activeChallenges.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-            <p>Chưa có thử thách đang thực hiện</p>
-          </div>
-        ) : (
-          activeChallenges.map((challenge) => {
-            const progressPercent = challenge.targetProgress > 0 
-              ? (challenge.currentProgress / challenge.targetProgress) * 100 
-              : 0;
-            return (
-              <div key={challenge.challengeId} style={styles.challengeCard}>
+        ) : challengeView === 'NO_PROGRESS' ? (
+          challengesWithoutProgress.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+              <p>🎉 Bạn đã tham gia tất cả các thử thách khả dụng.</p>
+            </div>
+          ) : (
+            challengesWithoutProgress.map((challenge) => (
+              <div key={challenge.id} style={styles.challengeCard}>
                 <div style={styles.challengeHeader}>
                   <h4 style={styles.challengeTitle}>{challenge.title}</h4>
-                  <span style={styles.challengeReward}>
-                    🎁 {challenge.rewardScore || 0} điểm
+                  <span style={styles.challengeReward}>🎁 {challenge.rewardScore} điểm</span>
+                </div>
+                {challenge.description && (
+                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.5 }}>
+                    {challenge.description}
+                  </p>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                  <span style={styles.challengeType}>{challenge.deadlineLabel}</span>
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      border: '1px solid var(--border-subtle)',
+                      fontSize: '12px',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    Chưa tham gia
+                  </span>
+                </div>
+              </div>
+            ))
+          )
+        ) : challengesWithProgress.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            <p>Chưa có thử thách nào đang theo dõi tiến độ.</p>
+          </div>
+        ) : (
+          challengesWithProgress.map((challenge) => {
+            const progressPercent =
+              challenge.status === 'COMPLETED'
+                ? 100
+                : challenge.targetProgress > 0
+                  ? (challenge.currentProgress / challenge.targetProgress) * 100
+                  : 0;
+            const statusLabel = challenge.status === 'COMPLETED' ? 'Đã hoàn thành' : 'Đang thực hiện';
+            const statusStyle =
+              challenge.status === 'COMPLETED'
+                ? { backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#047857' }
+                : { backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#1d4ed8' };
+
+            return (
+              <div key={challenge.id} style={styles.challengeCard}>
+                <div style={styles.challengeHeader}>
+                  <h4 style={styles.challengeTitle}>{challenge.title}</h4>
+                  <span style={styles.challengeReward}>🎁 {challenge.rewardScore} điểm</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={styles.challengeType}>{challenge.deadlineLabel}</span>
+                  <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, ...statusStyle }}>
+                    {statusLabel}
                   </span>
                 </div>
                 <div style={styles.challengeProgress}>
@@ -220,6 +439,10 @@ const ChallengesPage = () => {
                       style={{
                         ...styles.progressFill,
                         width: `${Math.min(progressPercent, 100)}%`,
+                        backgroundColor:
+                          challenge.status === 'COMPLETED'
+                            ? '#10B981'
+                            : (styles.progressFill && styles.progressFill.backgroundColor) || '#2196F3',
                       }}
                     />
                   </div>
@@ -227,58 +450,14 @@ const ChallengesPage = () => {
                     {challenge.currentProgress}/{challenge.targetProgress}
                   </span>
                 </div>
-                <span style={styles.challengeType}>
-                  {challenge.scope === 'DAILY' ? '📅 Hàng ngày' : 
-                   challenge.scope === 'WEEKLY' ? '📆 Hàng tuần' :
-                   challenge.scope === 'MONTHLY' ? '📊 Hàng tháng' : '🎯 Một lần'}
-                </span>
+                {challenge.status === 'COMPLETED' && challenge.completedAt && (
+                  <span style={{ ...styles.challengeType, color: '#047857' }}>
+                    Hoàn thành: {new Date(challenge.completedAt).toLocaleDateString('vi-VN')}
+                  </span>
+                )}
               </div>
             );
           })
-        )}
-
-        {completedChallenges.length > 0 && (
-          <>
-            <h3 style={{ ...styles.sectionTitle, marginTop: '24px', marginBottom: '16px' }}>
-              Thử thách đã hoàn thành
-            </h3>
-            {completedChallenges.map((challenge) => {
-              const completedDate = challenge.completedAt 
-                ? new Date(challenge.completedAt).toLocaleDateString('vi-VN')
-                : '';
-              return (
-                <div key={challenge.challengeId} style={{ ...styles.challengeCard, opacity: 0.8 }}>
-                  <div style={styles.challengeHeader}>
-                    <h4 style={styles.challengeTitle}>
-                      ✅ {challenge.title}
-                    </h4>
-                    <span style={styles.challengeReward}>
-                      🎁 {challenge.rewardScore || 0} điểm
-                    </span>
-                  </div>
-                  <div style={styles.challengeProgress}>
-                    <div style={styles.progressBar}>
-                      <div
-                        style={{
-                          ...styles.progressFill,
-                          width: '100%',
-                          backgroundColor: '#4CAF50',
-                        }}
-                      />
-                    </div>
-                    <span style={styles.challengeText}>
-                      {challenge.currentProgress}/{challenge.targetProgress} ✓
-                    </span>
-                  </div>
-                  {completedDate && (
-                    <span style={{ ...styles.challengeType, color: '#4CAF50' }}>
-                      Hoàn thành: {completedDate}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </>
         )}
       </div>
 
@@ -454,4 +633,5 @@ const ChallengesPage = () => {
 };
 
 export default ChallengesPage;
+
 
