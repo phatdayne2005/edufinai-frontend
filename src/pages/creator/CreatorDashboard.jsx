@@ -1,937 +1,665 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+    Plus, Edit, Trash2, Send, TrendingUp, Filter, ArrowLeft,
+    Clock, BarChart, Tag, FileText, CheckCircle, XCircle, AlertCircle, Eye, X
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, PenTool, Layout, BookOpen, BarChart2, Loader2, X, Edit2, Trash2, Send, FileText, Youtube, Plus, ChevronUp, ChevronDown, FileUp } from 'lucide-react';
-import { getMyLessons, getCreatorStats, createLesson, deleteLesson, updateLesson, submitLesson } from '../../services/learningApi';
-import { GlobalWorkerOptions, getDocument, version } from 'pdfjs-dist';
-
-// Set worker source for PDF.js
-GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
+import { learningService } from '../../services/learningService';
+import { useAuth } from '../../context/AuthContext';
+import { styles } from '../../styles/appStyles';
+import Header from '../../components/layout/Header';
 
 const CreatorDashboard = () => {
-  const navigate = useNavigate();
-  const lessonListRef = useRef(null);
-  const fileInputRef = useRef(null); // Ref for hidden file input
-  const [stats, setStats] = useState(null);
-  const [lessons, setLessons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showContentModal, setShowContentModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentLesson, setCurrentLesson] = useState(null);
-  const [contentBlocks, setContentBlocks] = useState([]);
-  const [isExtracting, setIsExtracting] = useState(false); // Loading state for PDF extraction
-  
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    difficulty: 'BEGINNER',
-    timeEstimate: 30
-  });
+    const navigate = useNavigate();
+    const { getToken } = useAuth();
+    const [lessons, setLessons] = useState([]);
+    const [creatorProfile, setCreatorProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [showFilter, setShowFilter] = useState(false);
+    const [selectedLesson, setSelectedLesson] = useState(null);
 
-  const fetchAllData = async () => {
-    try {
-      // setLoading(true); // Only for initial load or explicit refresh
-      const [statsData, lessonsData] = await Promise.all([
-        getCreatorStats(),
-        getMyLessons()
-      ]);
-      setStats(statsData);
-      setLessons(lessonsData);
-    } catch (err) {
-      console.error('Error fetching creator data:', err);
-      setLessons([]);
-      setStats({ totalLessons: 0 });
-    } finally {
-      setLoading(false);
-    }
-  };
+    const STATUSES = ['ALL', 'DRAFT', 'PENDING', 'APPROVED', 'REJECTED'];
 
-  useEffect(() => {
-    setLoading(true);
-    fetchAllData();
-  }, []);
+    useEffect(() => {
+        const fetchMyLessons = async () => {
+            const token = getToken();
+            if (!token) return;
+            try {
+                // Fetch creator profile and lessons in parallel
+                const [profile, allLessons] = await Promise.all([
+                    learningService.getCreatorProfile(token).catch(() => null),
+                    (statusFilter !== 'ALL')
+                        ? learningService.filterLessonsByStatus(token, statusFilter)
+                        : learningService.getAllLessons(token)
+                ]);
 
-  const handleSubmitLesson = async (e) => {
-    e.preventDefault();
-    try {
-        if (isEditing) {
-            const updated = await updateLesson(currentLesson.id, formData);
-            setCurrentLesson(updated);
-            alert('Cập nhật thông tin thành công!');
-            setShowCreateModal(false);
-            // Open content modal after edit info? Optional. User said "edit that lesson", so maybe let them choose.
-            // For now, just close info modal. User can click Edit Content if they want.
-        } else {
-            const newLesson = await createLesson(formData);
-            setCurrentLesson(newLesson);
-            setContentBlocks([]); // New lesson has no content yet
-            alert('Tạo bài học thành công! Hãy thêm nội dung chi tiết.');
-            setShowCreateModal(false);
-            setShowContentModal(true); // Switch to content modal
+                setCreatorProfile(profile);
+
+                // Filter to show only my lessons using profile ID
+                if (profile) {
+                    const myLessons = (allLessons || []).filter(l => l.creatorId === profile.id);
+                    setLessons(myLessons);
+                } else {
+                    setLessons(allLessons || []);
+                }
+            } catch (error) {
+                console.error('Error fetching lessons:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchMyLessons();
+    }, [getToken, statusFilter]);
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Bạn có chắc muốn xóa bài học này?')) return;
+        const token = getToken();
+        try {
+            await learningService.deleteLesson(token, id);
+            setLessons(lessons.filter(l => l.id !== id));
+            alert('Đã xóa bài học!');
+        } catch (error) {
+            console.error('Failed to delete:', error);
+            alert('Không thể xóa bài học: ' + error.message);
         }
-        fetchAllData();
-    } catch (err) {
-        alert('Lỗi: ' + err.message);
-    }
-  };
+    };
 
-  const handleSaveContent = async () => {
-      try {
-          const updatedLesson = { ...currentLesson, content: contentBlocks };
-          await updateLesson(currentLesson.id, updatedLesson);
-          alert('Lưu nội dung thành công!');
-          setShowContentModal(false);
-          setCurrentLesson(null);
-          setContentBlocks([]);
-          fetchAllData();
-      } catch (err) {
-          alert('Lỗi lưu nội dung: ' + err.message);
-      }
-  };
+    const handleSubmitForReview = async (id) => {
+        if (!window.confirm('Gửi bài học này để kiểm duyệt?')) return;
+        const token = getToken();
+        try {
+            await learningService.submitLesson(token, id);
+            // Refresh lessons
+            const allLessons = await learningService.getAllLessons(token);
+            const myLessons = allLessons.filter(l => l.creatorId === creatorProfile?.id);
+            setLessons(myLessons);
+            alert('Đã gửi yêu cầu kiểm duyệt!');
+        } catch (error) {
+            console.error('Failed to submit:', error);
+            alert('Không thể gửi yêu cầu: ' + error.message);
+        }
+    };
 
-  const handleDelete = async (id) => {
-      if (!window.confirm('Bạn có chắc chắn muốn xóa bài học này?')) return;
-      try {
-          await deleteLesson(id);
-          fetchAllData();
-      } catch (err) {
-          alert('Lỗi khi xóa: ' + err.message);
-      }
-  };
+    const handleCancelSubmission = async (lesson) => {
+        if (!window.confirm('Hủy yêu cầu kiểm duyệt và chuyển bài học về nháp?')) return;
+        const token = getToken();
+        try {
+            // Prepare payload to update (which resets status to DRAFT)
+            const payload = {
+                title: lesson.title,
+                description: lesson.description,
+                content: lesson.content,
+                durationMinutes: lesson.durationMinutes,
+                difficulty: lesson.difficulty,
+                thumbnailUrl: lesson.thumbnailUrl,
+                videoUrl: lesson.videoUrl,
+                tags: lesson.tags,
+                // Ensure quizJson is stringified if it's an object, matching CreateLessonPage logic
+                quizJson: typeof lesson.quizJson === 'object' ? JSON.stringify(lesson.quizJson) : lesson.quizJson
+            };
 
-  const handleEdit = (lesson) => {
-      setCurrentLesson(lesson);
-      setFormData({
-          title: lesson.title,
-          description: lesson.description,
-          difficulty: lesson.difficulty,
-          timeEstimate: lesson.timeEstimate
-      });
-      setIsEditing(true);
-      setShowCreateModal(true);
-  };
+            await learningService.updateLesson(token, lesson.id, payload);
 
-  const handleEditContent = (lesson) => {
-      setCurrentLesson(lesson);
-      setContentBlocks(lesson.content || []);
-      setShowContentModal(true);
-  };
+            // Refresh
+            const allLessons = await learningService.getAllLessons(token);
+            const myLessons = allLessons.filter(l => l.creatorId === creatorProfile?.id);
+            setLessons(myLessons);
+            alert('Đã hủy yêu cầu kiểm duyệt! Bài học đã chuyển về nháp.');
+        } catch (error) {
+            console.error('Failed to cancel submission:', error);
+            alert('Không thể hủy yêu cầu: ' + error.message);
+        }
+    };
 
-  const handleRequestReview = async (id) => {
-      if (!window.confirm('Gửi bài học này để kiểm duyệt? Bạn sẽ không thể chỉnh sửa trong khi chờ duyệt.')) return;
-      try {
-          await submitLesson(id);
-          alert('Đã gửi yêu cầu duyệt!');
-          fetchAllData();
-      } catch (err) {
-          alert('Lỗi: ' + err.message);
-      }
-  };
+    const viewLessonDetail = async (lesson) => {
+        const token = getToken();
+        try {
+            // Use getLessonById or getLessonBySlug depending on what's available/preferred
+            // Since we have the full lesson object in the list, we might just use it directly
+            // or fetch fresh data if needed. For now, let's use the lesson object directly
+            // but if content is missing (e.g. list view optimization), fetch it.
+            if (!lesson.content) {
+                const detailedLesson = await learningService.getLessonById(token, lesson.id);
+                setSelectedLesson(detailedLesson);
+            } else {
+                setSelectedLesson(lesson);
+            }
+        } catch (err) {
+            console.error('Error fetching lesson detail:', err);
+            setSelectedLesson(lesson);
+        }
+    };
 
-  const closeModal = () => {
-      setShowCreateModal(false);
-      setShowStatsModal(false);
-      setShowContentModal(false);
-      setIsEditing(false);
-      setCurrentLesson(null);
-      setFormData({ title: '', description: '', difficulty: 'BEGINNER', timeEstimate: 30 });
-  };
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'DRAFT': return '#9E9E9E';
+            case 'PENDING': return '#FF9800';
+            case 'APPROVED': return '#4CAF50';
+            case 'REJECTED': return '#F44336';
+            default: return '#666';
+        }
+    };
 
-  const scrollToLessons = () => {
-      if (lessonListRef.current) {
-          lessonListRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-  };
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'APPROVED': return <CheckCircle size={14} />;
+            case 'REJECTED': return <XCircle size={14} />;
+            case 'PENDING': return <Clock size={14} />;
+            case 'DRAFT': return <FileText size={14} />;
+            default: return null;
+        }
+    };
 
-  // Content Block Handlers
-  const addBlock = (type, initialData = '') => {
-      const newBlock = {
-          id: Date.now().toString(),
-          type,
-          data: initialData
-      };
-      setContentBlocks(prev => [...prev, newBlock]);
-  };
+    const getTagColor = (tag) => {
+        switch (tag) {
+            case 'BUDGETING': return { bg: '#E3F2FD', color: '#1976D2' };
+            case 'INVESTING': return { bg: '#E8F5E9', color: '#388E3C' };
+            case 'SAVING': return { bg: '#FFF3E0', color: '#F57C00' };
+            case 'DEBT': return { bg: '#FFEBEE', color: '#D32F2F' };
+            case 'TAX': return { bg: '#F3E5F5', color: '#7B1FA2' };
+            default: return { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' };
+        }
+    };
 
-  const updateBlockData = (id, data) => {
-      setContentBlocks(contentBlocks.map(b => b.id === id ? { ...b, data } : b));
-  };
+    const modalStyles = {
+        modalOverlay: {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+        },
+        modalContent: {
+            backgroundColor: 'var(--surface-card)',
+            padding: '32px',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            color: 'var(--text-primary)',
+        },
+        modalHeader: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '24px',
+            borderBottom: '1px solid var(--border-subtle)',
+            paddingBottom: '16px',
+        },
+        modalTitle: {
+            fontSize: '24px',
+            fontWeight: '700',
+            margin: 0,
+        },
+        closeButton: {
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+        },
+        detailRow: {
+            marginBottom: '20px',
+        },
+        detailLabel: {
+            fontWeight: '600',
+            color: 'var(--text-secondary)',
+            fontSize: '15px',
+            marginBottom: '8px',
+            display: 'block',
+        },
+        detailValue: {
+            color: 'var(--text-primary)',
+            fontSize: '16px',
+            lineHeight: '1.6',
+        },
+    };
 
-  const removeBlock = (id) => {
-      if (!window.confirm('Xóa block này?')) return;
-      setContentBlocks(contentBlocks.filter(b => b.id !== id));
-  };
-
-  const moveBlock = (index, direction) => {
-      const newBlocks = [...contentBlocks];
-      if (direction === 'up' && index > 0) {
-          [newBlocks[index], newBlocks[index - 1]] = [newBlocks[index - 1], newBlocks[index]];
-      } else if (direction === 'down' && index < newBlocks.length - 1) {
-          [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
-      }
-      setContentBlocks(newBlocks);
-  };
-
-  // PDF Extraction Handler
-  const handlePdfUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf') {
-      alert('Vui lòng chọn file PDF.');
-      return;
-    }
-
-    setIsExtracting(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = getDocument(arrayBuffer);
-      const pdf = await loadingTask.promise;
-      
-      let extractedText = '';
-      
-      // Iterate through all pages
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        extractedText += `--- Trang ${i} ---\n${pageText}\n\n`;
-      }
-
-      if (extractedText.trim()) {
-        addBlock('text', extractedText);
-        alert('Đã trích xuất văn bản từ PDF thành công!');
-      } else {
-        alert('Không tìm thấy văn bản trong file PDF này (có thể là ảnh scan).');
-      }
-    } catch (error) {
-      console.error('Error extracting PDF text:', error);
-      alert('Lỗi khi đọc file PDF: ' + error.message);
-    } finally {
-      setIsExtracting(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const styles = {
-    page: {
-      minHeight: '100vh',
-      backgroundColor: 'var(--surface-app)',
-      padding: '32px',
-      color: 'var(--text-primary)',
-    },
-    container: {
-      maxWidth: '1200px',
-      margin: '0 auto',
-    },
-    backButton: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      color: 'var(--text-muted)',
-      marginBottom: '32px',
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '16px',
-      transition: 'color 0.2s',
-    },
-    headerCard: {
-      backgroundColor: 'var(--surface-card)',
-      borderRadius: '16px',
-      boxShadow: 'var(--shadow-sm)',
-      border: '1px solid var(--border-subtle)',
-      padding: '32px',
-      marginBottom: '32px',
-    },
-    headerContent: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '16px',
-      marginBottom: '24px',
-    },
-    iconBox: {
-      padding: '12px',
-      backgroundColor: 'var(--color-primary-soft)',
-      borderRadius: '12px',
-      color: 'var(--color-primary)',
-    },
-    title: {
-      fontSize: '24px',
-      fontWeight: '700',
-      color: 'var(--text-primary)',
-      margin: 0,
-    },
-    subtitle: {
-      color: 'var(--text-muted)',
-      marginTop: '4px',
-      fontSize: '14px',
-    },
-    grid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-      gap: '24px',
-      marginTop: '32px',
-    },
-    card: {
-      padding: '24px',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: '12px',
-      backgroundColor: 'var(--surface-card)',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      textAlign: 'center',
-      minHeight: '160px',
-    },
-    cardIcon: {
-        marginBottom: '16px',
-        color: 'var(--color-primary)',
-    },
-    cardTitle: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      marginBottom: '8px',
-      color: 'var(--text-primary)',
-    },
-    cardText: {
-      color: 'var(--text-muted)',
-      fontSize: '14px',
-    },
-    sectionTitle: {
-        fontSize: '20px',
-        fontWeight: '700',
-        marginBottom: '16px',
-        color: 'var(--text-primary)',
-    },
-    lessonList: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-    },
-    lessonItem: {
-        backgroundColor: 'var(--surface-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
-        padding: '16px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '12px',
-    },
-    lessonInfo: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        flex: 1,
-        minWidth: '200px',
-    },
-    lessonTitle: {
-        fontWeight: '600',
-        color: 'var(--text-primary)',
-    },
-    lessonMeta: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: '13px',
-        color: 'var(--text-muted)',
-    },
-    lessonStatus: {
-        fontSize: '12px',
-        fontWeight: '500',
-        padding: '4px 8px',
-        borderRadius: '99px',
-        width: 'fit-content',
-    },
-    statusDraft: { backgroundColor: 'rgba(148, 163, 184, 0.2)', color: 'var(--text-muted)' },
-    statusPending: { backgroundColor: 'rgba(251, 191, 36, 0.2)', color: '#F59E0B' },
-    statusApproved: { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10B981' },
-    statusRejected: { backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#EF4444' },
-    
-    actions: {
-        display: 'flex',
-        gap: '8px',
-    },
-    iconBtn: {
-        padding: '8px',
-        borderRadius: '8px',
-        border: 'none',
-        backgroundColor: 'transparent',
-        cursor: 'pointer',
-        color: 'var(--text-secondary)',
-        transition: 'background 0.2s',
-    },
-    modalOverlay: {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)',
-    },
-    modalContent: {
-        backgroundColor: 'var(--surface-card)',
-        padding: '32px',
-        borderRadius: '24px',
-        width: '100%',
-        maxWidth: '500px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        color: 'var(--text-primary)',
-    },
-    modalContentLarge: {
-        backgroundColor: 'var(--surface-card)',
-        padding: '32px',
-        borderRadius: '24px',
-        width: '90%',
-        maxWidth: '800px',
-        height: '85vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        color: 'var(--text-primary)',
-    },
-    modalHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-    },
-    modalTitle: {
-        fontSize: '20px',
-        fontWeight: '700',
-        margin: 0,
-    },
-    closeButton: {
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        color: 'var(--text-muted)',
-    },
-    formGroup: {
-        marginBottom: '16px',
-    },
-    input: {
-        width: '100%',
-        padding: '12px',
-        borderRadius: '12px',
-        border: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--surface-muted)',
-        color: 'var(--text-primary)',
-        fontSize: '14px',
-        marginTop: '8px',
-        outline: 'none',
-    },
-    label: {
-        fontSize: '14px',
-        fontWeight: '600',
-        color: 'var(--text-secondary)',
-    },
-    submitButton: {
-        width: '100%',
-        padding: '12px',
-        borderRadius: '12px',
-        border: 'none',
-        backgroundColor: 'var(--color-primary)',
-        color: '#fff',
-        fontWeight: '600',
-        cursor: 'pointer',
-        marginTop: '16px',
-    },
-    statRow: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px',
-        paddingBottom: '12px',
-        borderBottom: '1px solid var(--border-subtle)',
-    },
-    statLabel: {
-        color: 'var(--text-secondary)',
-        fontSize: '15px',
-    },
-    statValue: {
-        fontWeight: 'bold',
-        fontSize: '16px',
-        color: 'var(--text-primary)',
-    },
-    progressBarContainer: {
-        height: '8px',
-        backgroundColor: 'var(--surface-muted)',
-        borderRadius: '99px',
-        overflow: 'hidden',
-        marginTop: '8px',
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: 'var(--color-primary)',
-        borderRadius: '99px',
-    },
-    // Content Editor Styles
-    editorToolbar: {
-        display: 'flex',
-        gap: '12px',
-        marginBottom: '24px',
-        padding: '16px',
-        backgroundColor: 'var(--surface-muted)',
-        borderRadius: '12px',
-    },
-    toolbarBtn: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 16px',
-        borderRadius: '8px',
-        border: 'none',
-        backgroundColor: 'var(--surface-card)',
-        color: 'var(--text-primary)',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: '500',
-        boxShadow: 'var(--shadow-sm)',
-    },
-    editorBody: {
-        flex: 1,
-        overflowY: 'auto',
-        paddingRight: '8px',
-    },
-    blockItem: {
-        marginBottom: '24px',
-        padding: '16px',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
-        backgroundColor: 'var(--surface-card)',
-        position: 'relative',
-    },
-    blockControls: {
-        position: 'absolute',
-        right: '12px',
-        top: '12px',
-        display: 'flex',
-        gap: '4px',
-    },
-    blockLabel: {
-        fontSize: '12px',
-        fontWeight: '600',
-        color: 'var(--text-muted)',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-    },
-    textArea: {
-        width: '100%',
-        minHeight: '120px',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--surface-muted)',
-        color: 'var(--text-primary)',
-        fontSize: '15px',
-        lineHeight: '1.6',
-        outline: 'none',
-        resize: 'vertical',
-    }
-  };
-
-  const getStatusStyle = (status) => {
-      switch (status) {
-          case 'DRAFT': return styles.statusDraft;
-          case 'PENDING': return styles.statusPending;
-          case 'APPROVED': return styles.statusApproved;
-          case 'REJECTED': return styles.statusRejected;
-          default: return styles.statusDraft;
-      }
-  };
-
-  return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <button 
-          onClick={() => navigate('/')}
-          style={styles.backButton}
-          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-        >
-          <ArrowLeft size={20} />
-          Quay lại trang chủ
-        </button>
-        
-        <div style={styles.headerCard}>
-          <div style={styles.headerContent}>
-            <div style={styles.iconBox}>
-              <PenTool size={32} />
-            </div>
-            <div>
-              <h1 style={styles.title}>Creator Dashboard</h1>
-              <p style={styles.subtitle}>Quản lý nội dung và khóa học của bạn</p>
-            </div>
-          </div>
-          
-          <div style={styles.grid}>
-            <div 
-                style={styles.card}
-                onClick={scrollToLessons}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+    return (
+        <div style={styles.page}>
+            <button
+                onClick={() => navigate(-1)}
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 16,
+                    fontSize: 16,
+                    color: 'var(--text-secondary)'
                 }}
             >
-                <div style={styles.cardIcon}><BookOpen size={32} /></div>
-                <h3 style={styles.cardTitle}>{stats?.totalLessons || 0}</h3>
-                <p style={styles.cardText}>Bài viết của tôi</p>
-            </div>
-            <div 
-                style={styles.card}
-                onClick={() => { setIsEditing(false); setShowCreateModal(true); }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                }}
-            >
-                <div style={styles.cardIcon}><PenTool size={32} /></div>
-                <h3 style={styles.cardTitle}>Tạo mới</h3>
-                <p style={styles.cardText}>Soạn thảo bài học mới</p>
-            </div>
-            <div 
-                style={styles.card}
-                onClick={() => setShowStatsModal(true)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                  e.currentTarget.style.borderColor = 'var(--color-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                }}
-            >
-                <div style={styles.cardIcon}><BarChart2 size={32} /></div>
-                <h3 style={styles.cardTitle}>Thống kê</h3>
-                <p style={styles.cardText}>Lượt xem và tương tác</p>
-            </div>
-          </div>
-        </div>
+                <ArrowLeft size={20} /> Quay lại
+            </button>
 
-        <div ref={lessonListRef}>
-            <h2 style={styles.sectionTitle}>Danh sách bài học</h2>
-            {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-                    <Loader2 className="animate-spin" />
+            <Header title="Creator Dashboard" subtitle="Quản lý bài học của bạn" />
+
+            {/* Creator Stats */}
+            {creatorProfile && (
+                <div style={{
+                    ...styles.progressCard,
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                    marginBottom: 20,
+                    background: 'var(--surface-card)'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <TrendingUp size={24} color="#4CAF50" />
+                        <p style={styles.progressLabel}>Thống kê Creator</p>
+                    </div>
+                    <div style={styles.progressStats}>
+                        <div>
+                            <h3 style={styles.progressNumber}>{creatorProfile.totalLessons || 0}</h3>
+                            <p style={styles.progressText}>Tổng số bài học đã tạo</p>
+                        </div>
+                        <div>
+                            <h3 style={styles.progressNumber}>
+                                {lessons.filter(l => l.status === 'APPROVED').length}
+                            </h3>
+                            <p style={styles.progressText}>Số bài đã được duyệt</p>
+                        </div>
+                        <div>
+                            <h3 style={styles.progressNumber}>
+                                {lessons.filter(l => l.status === 'PENDING').length}
+                            </h3>
+                            <p style={styles.progressText}>Số bài đang chờ duyệt</p>
+                        </div>
+                    </div>
                 </div>
-            ) : lessons.length > 0 ? (
-                <div style={styles.lessonList}>
-                    {lessons.map((lesson) => (
-                        <div key={lesson.id} style={styles.lessonItem}>
-                            <div style={styles.lessonInfo}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={styles.lessonTitle}>{lesson.title}</span>
-                                    <span style={{...styles.lessonStatus, ...getStatusStyle(lesson.status)}}>{lesson.status}</span>
+            )}
+
+            {/* Create Button */}
+            <button
+                onClick={() => navigate('/creator/lesson/new')}
+                style={{
+                    ...styles.addButton,
+                    marginBottom: 20,
+                    width: '100%',
+                    justifyContent: 'center'
+                }}
+            >
+                <Plus size={20} /> Tạo bài học mới
+            </button>
+
+            {/* Filter by Status */}
+            <div style={{ marginBottom: 20 }}>
+                <button
+                    onClick={() => setShowFilter(!showFilter)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '12px 0',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        width: '100%',
+                        justifyContent: 'flex-start'
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Filter size={20} color="#666" />
+                        Lọc trạng thái
+                    </div>
+                </button>
+
+                {showFilter && (
+                    <div style={{
+                        marginTop: 12,
+                        padding: '16px',
+                        background: 'var(--surface-card)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 12,
+                        animation: 'fadeIn 0.3s ease-in-out'
+                    }}>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>Trạng thái:</p>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {STATUSES.map(status => (
+                                <button
+                                    key={status}
+                                    onClick={() => setStatusFilter(status)}
+                                    style={{
+                                        padding: '6px 16px',
+                                        borderRadius: 20,
+                                        border: statusFilter === status ? '2px solid #2196F3' : '1px solid var(--border-subtle)',
+                                        background: statusFilter === status ? 'rgba(33, 150, 243, 0.1)' : 'var(--bg-primary)',
+                                        color: statusFilter === status ? '#2196F3' : 'var(--text-secondary)',
+                                        fontSize: 13,
+                                        cursor: 'pointer',
+                                        fontWeight: statusFilter === status ? 600 : 400,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}
+                                >
+                                    {status !== 'ALL' && getStatusIcon(status)}
+                                    {status}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>
+                    Danh sách bài học đã tạo ({lessons.length})
+                </h3>
+                {loading ? <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Đang tải...</p> : (
+                    lessons.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            Bạn chưa tạo bài học nào {statusFilter !== 'ALL' && `với trạng thái ${statusFilter}`}.
+                        </p>
+                    ) : (
+                        lessons.map(lesson => (
+                            <div key={lesson.id} style={{ ...styles.lessonCard, display: 'block', padding: 20 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                                    <h4 style={{
+                                        ...styles.lessonTitle,
+                                        margin: 0,
+                                        fontSize: 18,
+                                        fontWeight: 700,
+                                        color: 'var(--text-primary)'
+                                    }}>
+                                        {lesson.title}
+                                    </h4>
+                                    <span style={{
+                                        fontSize: 12,
+                                        padding: '6px 12px',
+                                        borderRadius: 20,
+                                        backgroundColor: `${getStatusColor(lesson.status)}15`,
+                                        color: getStatusColor(lesson.status),
+                                        fontWeight: 600,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        border: `1px solid ${getStatusColor(lesson.status)}30`
+                                    }}>
+                                        {getStatusIcon(lesson.status)}
+                                        {lesson.status}
+                                    </span>
                                 </div>
-                                <div style={styles.lessonMeta}>
-                                    <span>{new Date(lesson.updatedAt || lesson.createdAt).toLocaleDateString('vi-VN')}</span>
-                                    <span>• {lesson.difficulty}</span>
-                                    <span>• {lesson.timeEstimate} phút</span>
-                                </div>
+
+                                <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
+                                    {lesson.description || 'Chưa có mô tả'}
+                                </p>
+
                                 {lesson.status === 'REJECTED' && lesson.commentByMod && (
-                                    <div style={{ fontSize: '13px', color: '#EF4444', marginTop: '4px' }}>
-                                        Lý do từ chối: {lesson.commentByMod}
+                                    <div style={{
+                                        padding: 12,
+                                        background: '#FFEBEE',
+                                        borderLeft: '3px solid #F44336',
+                                        borderRadius: 4,
+                                        marginBottom: 16,
+                                        display: 'flex',
+                                        gap: 10
+                                    }}>
+                                        <AlertCircle size={18} color="#D32F2F" style={{ marginTop: 2 }} />
+                                        <div>
+                                            <p style={{ fontSize: 13, color: '#D32F2F', margin: '0 0 4px 0', fontWeight: 600 }}>
+                                                Yêu cầu chỉnh sửa:
+                                            </p>
+                                            <p style={{ fontSize: 13, color: '#C62828', margin: 0 }}>
+                                                {lesson.commentByMod}
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 16,
+                                        flexWrap: 'wrap',
+                                        fontSize: 13,
+                                        color: 'var(--text-tertiary)'
+                                    }}>
+                                        {lesson.tags && lesson.tags.length > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <Tag size={14} />
+                                                {lesson.tags.map((tag, idx) => {
+                                                    const tagStyle = getTagColor(tag);
+                                                    return (
+                                                        <span key={idx} style={{
+                                                            backgroundColor: tagStyle.bg,
+                                                            color: tagStyle.color,
+                                                            padding: '2px 8px',
+                                                            borderRadius: 4,
+                                                            fontSize: 12,
+                                                            fontWeight: 500
+                                                        }}>
+                                                            {tag}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <BarChart size={14} />
+                                            <span style={{ fontWeight: 500 }}>{lesson.difficulty}</span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <Clock size={14} />
+                                            <span>{lesson.durationMinutes} phút</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        {(lesson.status === 'DRAFT' || lesson.status === 'REJECTED') && (
+                                            <>
+                                                <button
+                                                    onClick={() => navigate(`/creator/lesson/edit/${lesson.id}`)}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        borderRadius: 8,
+                                                        border: '1px solid var(--border-subtle)',
+                                                        background: 'var(--bg-secondary)',
+                                                        color: 'var(--text-primary)',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        fontWeight: 500,
+                                                        fontSize: 13
+                                                    }}
+                                                >
+                                                    <Edit size={14} /> Sửa
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSubmitForReview(lesson.id)}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        borderRadius: 8,
+                                                        border: 'none',
+                                                        background: '#4CAF50',
+                                                        color: 'white',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        fontWeight: 500,
+                                                        fontSize: 13
+                                                    }}
+                                                >
+                                                    <Send size={14} /> Gửi duyệt
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(lesson.id)}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        borderRadius: 8,
+                                                        border: '1px solid #FFEBEE',
+                                                        background: '#FFEBEE',
+                                                        color: '#D32F2F',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        fontWeight: 500,
+                                                        fontSize: 13
+                                                    }}
+                                                >
+                                                    <Trash2 size={14} /> Xóa
+                                                </button>
+                                            </>
+                                        )}
+                                        {lesson.status === 'PENDING' && (
+                                            <button
+                                                onClick={() => handleCancelSubmission(lesson)}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: 8,
+                                                    border: '1px solid #FF9800',
+                                                    background: 'transparent',
+                                                    color: '#FF9800',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    fontWeight: 500,
+                                                    fontSize: 13
+                                                }}
+                                            >
+                                                <XCircle size={14} /> Hủy gửi
+                                            </button>
+                                        )}
+                                        {lesson.status === 'APPROVED' && (
+                                            <button
+                                                onClick={() => viewLessonDetail(lesson)}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: 8,
+                                                    border: '1px solid #2196F3',
+                                                    background: 'rgba(33, 150, 243, 0.1)',
+                                                    color: '#2196F3',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    fontWeight: 500,
+                                                    fontSize: 13
+                                                }}
+                                            >
+                                                <Eye size={14} /> Xem
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <div style={styles.actions}>
-                                {lesson.status === 'DRAFT' || lesson.status === 'REJECTED' ? (
-                                    <>
-                                        <button 
-                                            style={styles.iconBtn} 
-                                            title="Soạn nội dung"
-                                            onClick={() => handleEditContent(lesson)}
-                                        >
-                                            <FileText size={18} color="var(--color-primary)" />
-                                        </button>
-                                        <button 
-                                            style={styles.iconBtn} 
-                                            title="Gửi duyệt"
-                                            onClick={() => handleRequestReview(lesson.id)}
-                                        >
-                                            <Send size={18} color="#10B981" />
-                                        </button>
-                                        <button 
-                                            style={styles.iconBtn} 
-                                            title="Chỉnh sửa thông tin"
-                                            onClick={() => handleEdit(lesson)}
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                        <button 
-                                            style={styles.iconBtn} 
-                                            title="Xóa"
-                                            onClick={() => handleDelete(lesson.id)}
-                                        >
-                                            <Trash2 size={18} color="#EF4444" />
-                                        </button>
-                                    </>
-                                ) : (
-                                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                        {lesson.status === 'PENDING' ? 'Đang chờ duyệt' : 'Đã xuất bản'}
-                                    </span>
-                                )}
+                        ))
+                    )
+                )}
+            </div>
+
+            {selectedLesson && (
+                <div style={modalStyles.modalOverlay} onClick={() => setSelectedLesson(null)}>
+                    <div style={modalStyles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <div style={modalStyles.modalHeader}>
+                            <div>
+                                <h2 style={modalStyles.modalTitle}>{selectedLesson.title}</h2>
+                                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                                    {new Date(selectedLesson.createdAt).toLocaleString('vi-VN')}
+                                </span>
+                            </div>
+                            <button style={modalStyles.closeButton} onClick={() => setSelectedLesson(null)}>
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div style={modalStyles.detailRow}>
+                            <span style={modalStyles.detailLabel}>Mô tả</span>
+                            <div style={modalStyles.detailValue}>{selectedLesson.description}</div>
+                        </div>
+
+                        {selectedLesson.videoUrl && (
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Video bài học</span>
+                                <div style={{ marginTop: '8px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                                    {selectedLesson.videoUrl.includes('youtube.com') || selectedLesson.videoUrl.includes('youtu.be') ? (
+                                        <iframe
+                                            width="100%"
+                                            height="400"
+                                            src={selectedLesson.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                                            title="Lesson Video"
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <video controls width="100%" style={{ display: 'block' }}>
+                                            <source src={selectedLesson.videoUrl} type="video/mp4" />
+                                            Trình duyệt của bạn không hỗ trợ thẻ video.
+                                        </video>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={modalStyles.detailRow}>
+                            <span style={modalStyles.detailLabel}>Nội dung</span>
+                            <div style={{
+                                ...modalStyles.detailValue,
+                                maxHeight: '300px',
+                                overflowY: 'auto',
+                                padding: '16px',
+                                background: 'var(--bg-secondary)',
+                                borderRadius: 8,
+                                fontSize: '15px'
+                            }}>
+                                {selectedLesson.content || 'Chưa có nội dung'}
                             </div>
                         </div>
-                    ))}
-                </div>
-            ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Chưa có bài học nào. Hãy tạo bài học đầu tiên!
+
+                        <div style={{ display: 'flex', gap: '32px', marginBottom: '24px' }}>
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Độ khó</span>
+                                <div style={modalStyles.detailValue}>{selectedLesson.difficulty}</div>
+                            </div>
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Thời gian ước tính</span>
+                                <div style={modalStyles.detailValue}>{selectedLesson.durationMinutes} phút</div>
+                            </div>
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Trạng thái</span>
+                                <div style={modalStyles.detailValue}>{selectedLesson.status}</div>
+                            </div>
+                        </div>
+
+                        {selectedLesson.commentByMod && (
+                            <div style={modalStyles.detailRow}>
+                                <span style={modalStyles.detailLabel}>Nhận xét từ moderator</span>
+                                <div style={{
+                                    ...modalStyles.detailValue,
+                                    padding: '16px',
+                                    background: 'rgba(244, 67, 54, 0.1)',
+                                    borderLeft: '4px solid #F44336',
+                                    borderRadius: 4
+                                }}>
+                                    {selectedLesson.commentByMod}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
-      </div>
-
-      {/* Create/Edit Info Modal */}
-      {showCreateModal && (
-        <div style={styles.modalOverlay} onClick={closeModal}>
-            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                <div style={styles.modalHeader}>
-                    <h2 style={styles.modalTitle}>{isEditing ? 'Cập nhật thông tin' : 'Tạo bài học mới'}</h2>
-                    <button style={styles.closeButton} onClick={closeModal}>
-                        <X size={24} />
-                    </button>
-                </div>
-                <form onSubmit={handleSubmitLesson}>
-                    <div style={styles.formGroup}>
-                        <label style={styles.label}>Tiêu đề</label>
-                        <input 
-                            style={styles.input} 
-                            type="text" 
-                            value={formData.title}
-                            onChange={(e) => setFormData({...formData, title: e.target.value})}
-                            required
-                            placeholder="Nhập tiêu đề bài học..."
-                        />
-                    </div>
-                    <div style={styles.formGroup}>
-                        <label style={styles.label}>Mô tả ngắn</label>
-                        <textarea 
-                            style={{...styles.input, minHeight: '100px', resize: 'vertical'}} 
-                            value={formData.description}
-                            onChange={(e) => setFormData({...formData, description: e.target.value})}
-                            placeholder="Mô tả nội dung bài học..."
-                        />
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                        <div style={{...styles.formGroup, flex: 1}}>
-                            <label style={styles.label}>Độ khó</label>
-                            <select 
-                                style={styles.input}
-                                value={formData.difficulty}
-                                onChange={(e) => setFormData({...formData, difficulty: e.target.value})}
-                            >
-                                <option value="BEGINNER">Cơ bản</option>
-                                <option value="INTERMEDIATE">Trung bình</option>
-                                <option value="ADVANCED">Nâng cao</option>
-                            </select>
-                        </div>
-                        <div style={{...styles.formGroup, flex: 1}}>
-                            <label style={styles.label}>Thời gian (phút)</label>
-                            <input 
-                                style={styles.input}
-                                type="number"
-                                value={formData.timeEstimate}
-                                onChange={(e) => setFormData({...formData, timeEstimate: parseInt(e.target.value)})}
-                                min="1"
-                            />
-                        </div>
-                    </div>
-                    <button type="submit" style={styles.submitButton}>
-                        {isEditing ? 'Lưu thông tin' : 'Tạo & Soạn nội dung'}
-                    </button>
-                </form>
-            </div>
-        </div>
-      )}
-
-      {/* Content Editor Modal */}
-      {showContentModal && (
-        <div style={styles.modalOverlay} onClick={() => {
-            if (window.confirm('Đóng mà không lưu?')) closeModal();
-        }}>
-            <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
-                <div style={styles.modalHeader}>
-                    <div>
-                        <h2 style={styles.modalTitle}>Soạn thảo nội dung</h2>
-                        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '14px' }}>
-                            {currentLesson?.title}
-                        </p>
-                    </div>
-                    <button style={styles.closeButton} onClick={() => {
-                        if (window.confirm('Đóng mà không lưu?')) closeModal();
-                    }}>
-                        <X size={24} />
-                    </button>
-                </div>
-                
-                <div style={styles.editorToolbar}>
-                    <button style={styles.toolbarBtn} onClick={() => addBlock('text')}>
-                        <FileText size={16} /> Thêm đoạn văn
-                    </button>
-                    <button style={styles.toolbarBtn} onClick={() => addBlock('video')}>
-                        <Youtube size={16} /> Thêm Video YouTube
-                    </button>
-                    <button style={styles.toolbarBtn} onClick={() => fileInputRef.current?.click()} disabled={isExtracting}>
-                        {isExtracting ? <Loader2 className="animate-spin" size={16} /> : <FileUp size={16} />} 
-                        {isExtracting ? ' Đang đọc...' : ' Import PDF'}
-                    </button>
-                    {/* Hidden File Input */}
-                    <input 
-                        type="file"
-                        ref={fileInputRef}
-                        style={{ display: 'none' }}
-                        accept="application/pdf"
-                        onChange={handlePdfUpload}
-                    />
-                </div>
-
-                <div style={styles.editorBody}>
-                    {contentBlocks.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                            Chưa có nội dung. Hãy thêm các khối nội dung bên trên.
-                        </div>
-                    ) : (
-                        contentBlocks.map((block, index) => (
-                            <div key={block.id} style={styles.blockItem}>
-                                <div style={styles.blockControls}>
-                                    <button style={styles.iconBtn} onClick={() => moveBlock(index, 'up')} disabled={index === 0}>
-                                        <ChevronUp size={16} />
-                                    </button>
-                                    <button style={styles.iconBtn} onClick={() => moveBlock(index, 'down')} disabled={index === contentBlocks.length - 1}>
-                                        <ChevronDown size={16} />
-                                    </button>
-                                    <button style={styles.iconBtn} onClick={() => removeBlock(block.id)}>
-                                        <Trash2 size={16} color="#EF4444" />
-                                    </button>
-                                </div>
-                                
-                                {block.type === 'text' && (
-                                    <>
-                                        <div style={styles.blockLabel}><FileText size={14} /> Văn bản</div>
-                                        <textarea 
-                                            style={styles.textArea}
-                                            value={block.data}
-                                            onChange={(e) => updateBlockData(block.id, e.target.value)}
-                                            placeholder="Nhập nội dung bài học..."
-                                        />
-                                    </>
-                                )}
-
-                                {block.type === 'video' && (
-                                    <>
-                                        <div style={styles.blockLabel}><Youtube size={14} /> YouTube URL</div>
-                                        <input 
-                                            style={styles.input}
-                                            type="text"
-                                            value={block.data}
-                                            onChange={(e) => updateBlockData(block.id, e.target.value)}
-                                            placeholder="https://www.youtube.com/watch?v=..."
-                                        />
-                                        {block.data && (
-                                            <div style={{ marginTop: '12px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#000' }}>
-                                                {/* Preview placeholder */}
-                                                <div style={{ padding: '20px', textAlign: 'center', color: '#fff', fontSize: '13px' }}>
-                                                    Video Preview: {block.data}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        ))
-                    )}
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginTop: '16px' }}>
-                    <button style={styles.submitButton} onClick={handleSaveContent}>
-                        Lưu tất cả nội dung
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {showStatsModal && (
-        <div style={styles.modalOverlay} onClick={() => setShowStatsModal(false)}>
-            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                <div style={styles.modalHeader}>
-                    <h2 style={styles.modalTitle}>Thống kê chi tiết</h2>
-                    <button style={styles.closeButton} onClick={() => setShowStatsModal(false)}>
-                        <X size={24} />
-                    </button>
-                </div>
-                
-                <div style={styles.statRow}>
-                    <span style={styles.statLabel}>Tổng lượt xem</span>
-                    <span style={styles.statValue}>{stats?.totalViews?.toLocaleString() || '1,250'}</span>
-                </div>
-                <div style={styles.statRow}>
-                    <span style={styles.statLabel}>Đánh giá trung bình</span>
-                    <span style={styles.statValue}>{stats?.avgRating || '4.5'} / 5.0</span>
-                </div>
-                <div style={styles.statRow}>
-                    <span style={styles.statLabel}>Bài học đã xuất bản</span>
-                    <span style={styles.statValue}>{stats?.approvedLessons || 0}</span>
-                </div>
-
-                <div style={{ marginTop: '24px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-primary)' }}>Top bài học quan tâm</h3>
-                    
-                    {[
-                        { title: 'Nhập môn Tài chính', views: 540, percent: '80%' },
-                        { title: 'Đầu tư Chứng khoán', views: 320, percent: '50%' },
-                        { title: 'Quản lý chi tiêu', views: 150, percent: '25%' }
-                    ].map((item, index) => (
-                        <div key={index} style={{ marginBottom: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                                <span>{item.title}</span>
-                                <span>{item.views} views</span>
-                            </div>
-                            <div style={styles.progressBarContainer}>
-                                <div style={{ ...styles.progressBarFill, width: item.percent }}></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-      )}
-    </div>
-  );
+    );
 };
 
 export default CreatorDashboard;

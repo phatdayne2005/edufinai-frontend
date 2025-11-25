@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
@@ -12,11 +12,12 @@ const LoginPage = () => {
   const [formState, setFormState] = useState({ username: '', password: '' });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showDebugTools, setShowDebugTools] = useState(false);
 
-  const handleChange = (event) => {
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -75,9 +76,6 @@ const LoginPage = () => {
 
   return (
     <div style={styles.authWrapper}>
-      <div style={styles.authSpectrum} aria-hidden />
-      <div style={styles.authBackdrop} aria-hidden />
-      <div style={styles.authBackdropGlow} aria-hidden />
       <div style={styles.authCard}>
         <h1 style={styles.authTitle}>Đăng nhập</h1>
         <p style={styles.authSubtitle}>
@@ -96,92 +94,118 @@ const LoginPage = () => {
 
         {error && <div style={styles.authError}>{error}</div>}
 
-        {/* Debug controls */}
-        <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontSize: '12px' }}>
-          <div style={{ marginBottom: '10px' }}>
-            <strong>Debug Tools:</strong>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => {
-                exportLogs();
-                alert('Logs đã được tải xuống!');
-              }}
-              style={{
-                padding: '5px 10px',
-                fontSize: '12px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              📥 Tải xuống Logs ({getLogs().length} entries)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('Bạn có chắc muốn xóa tất cả logs?')) {
-                  clearLogs();
-                  alert('Logs đã được xóa!');
-                }
-              }}
-              style={{
-                padding: '5px 10px',
-                fontSize: '12px',
-                backgroundColor: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              🗑️ Xóa Logs
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                testAuth.showToken();
-              }}
-              style={{
-                padding: '5px 10px',
-                fontSize: '12px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              🔑 Xem Token
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const url = prompt('Nhập URL để test (ví dụ: http://localhost:8080/auth/me):', 'http://localhost:8080/auth/me');
-                if (url) {
-                  testAuth.call(url, 'GET');
-                }
-              }}
-              style={{
-                padding: '5px 10px',
-                fontSize: '12px',
-                backgroundColor: '#17a2b8',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              🧪 Test API
-            </button>
-          </div>
-          <div style={{ marginTop: '10px', fontSize: '11px', color: '#666' }}>
-            💡 Hoặc mở Console (F12) và dùng: <code>testApi(url, method, body)</code> hoặc <code>testAuth.getCurrentUser()</code>
-          </div>
+        {/* Debug controls - Collapsed by default for performance */}
+        <div style={{ marginBottom: '12px' }}>
+          <button
+            type="button"
+            onClick={() => setShowDebugTools(!showDebugTools)}
+            style={{
+              padding: '8px 12px',
+              fontSize: '12px',
+              backgroundColor: '#f5f5f5',
+              color: '#666',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>🛠️ Debug Tools</span>
+            <span>{showDebugTools ? '▼' : '▶'}</span>
+          </button>
         </div>
+
+        {showDebugTools && (
+          <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontSize: '12px' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <strong>Debug Tools:</strong>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  exportLogs();
+                  alert('Logs đã được tải xuống!');
+                }}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '12px',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                📥 Tải xuống Logs ({getLogs().length} entries)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Bạn có chắc muốn xóa tất cả logs?')) {
+                    clearLogs();
+                    alert('Logs đã được xóa!');
+                  }
+                }}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '12px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                🗑️ Xóa Logs
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  testAuth.showToken();
+                }}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '12px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                🔑 Xem Token
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = prompt('Nhập URL để test (ví dụ: http://localhost:8080/auth/me):', 'http://localhost:8080/auth/me');
+                  if (url) {
+                    testAuth.call(url, 'GET');
+                  }
+                }}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '12px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                🧪 Test API
+              </button>
+            </div>
+            <div style={{ marginTop: '10px', fontSize: '11px', color: '#666' }}>
+              💡 Hoặc mở Console (F12) và dùng: <code>testApi(url, method, body)</code> hoặc <code>testAuth.getCurrentUser()</code>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={styles.authForm}>
           <div style={styles.authField}>
@@ -239,7 +263,7 @@ const LoginPage = () => {
           </Link>
         </p>
       </div>
-    </div>
+    </div >
   );
 };
 
