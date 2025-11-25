@@ -176,18 +176,44 @@ export const unregisterNotificationToken = async (jwtTokenOverride) => {
 
 export const listenForegroundNotifications = (callback) => {
     let unsubscribe = null;
-    ensureMessagingInstance().then((messaging) => {
-        if (!messaging) {
-            return;
-        }
-        unsubscribe = onMessage(messaging, (payload) => {
-            logFCM('Foreground notification received', payload);
-            callback?.(payload);
+    let isCleanedUp = false;
+    
+    ensureMessagingInstance()
+        .then((messaging) => {
+            if (!messaging || isCleanedUp) {
+                logFCM('Cannot setup foreground listener: messaging not available or already cleaned up');
+                return;
+            }
+            
+            try {
+                unsubscribe = onMessage(messaging, (payload) => {
+                    logFCM('Foreground notification received', payload);
+                    if (callback && typeof callback === 'function') {
+                        try {
+                            callback(payload);
+                        } catch (error) {
+                            console.error('[FCM] Error in foreground notification callback:', error);
+                        }
+                    }
+                });
+                logFCM('Foreground notification listener registered');
+            } catch (error) {
+                console.error('[FCM] Failed to register foreground notification listener:', error);
+            }
+        })
+        .catch((error) => {
+            console.error('[FCM] Failed to initialize messaging for foreground notifications:', error);
         });
-    });
+    
     return () => {
-        if (unsubscribe) {
-            unsubscribe();
+        isCleanedUp = true;
+        if (unsubscribe && typeof unsubscribe === 'function') {
+            try {
+                unsubscribe();
+                logFCM('Foreground notification listener unsubscribed');
+            } catch (error) {
+                console.error('[FCM] Error unsubscribing foreground listener:', error);
+            }
         }
     };
 };

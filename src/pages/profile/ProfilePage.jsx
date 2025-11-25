@@ -7,6 +7,7 @@ import { styles } from '../../styles/appStyles';
 import ThemeCustomizer from '../../components/settings/ThemeCustomizer';
 import { askQuestion } from '../../services/aiService';
 import { getMyBadges, getUserRewards } from '../../services/gamificationApi';
+import { formatDateTime } from '../../utils/formatters';
 
 const menuItems = [
   { icon: '🔔', label: 'Thông báo' },
@@ -37,6 +38,18 @@ const widgetConfigs = [
     description: 'Mục tiêu tài chính cần ưu tiên cùng % hoàn thành.',
   },
 ];
+
+// Helper function để get badge type label và color
+const getBadgeTypeInfo = (badgeType) => {
+  const typeMap = {
+    'DAILY': { label: '📅 Hàng ngày', color: '#4CAF50', bg: 'rgba(76, 175, 80, 0.1)' },
+    'WEEKLY': { label: '📆 Hàng tuần', color: '#2196F3', bg: 'rgba(33, 150, 243, 0.1)' },
+    'MONTHLY': { label: '📊 Hàng tháng', color: '#9C27B0', bg: 'rgba(156, 39, 176, 0.1)' },
+    'SEASONAL': { label: '🍂 Theo mùa', color: '#FF9800', bg: 'rgba(255, 152, 0, 0.1)' },
+    'SPECIAL': { label: '⭐ Đặc biệt', color: '#FFD700', bg: 'rgba(255, 215, 0, 0.1)' },
+  };
+  return typeMap[badgeType] || { label: badgeType || 'Không xác định', color: '#666', bg: 'rgba(0, 0, 0, 0.05)' };
+};
 
 const ProfilePage = () => {
   const { user, logout } = useAuth();
@@ -214,51 +227,140 @@ const ProfilePage = () => {
             <p>Chưa có badge nào. Hãy hoàn thành các thử thách để nhận badge!</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
-            {badges.map((badge) => (
-              <div
-                key={badge.badgeCode}
-                style={{
-                  padding: '16px',
-                  backgroundColor: 'var(--card-bg)',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  textAlign: 'center',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                {badge.iconUrl ? (
-                  <img 
-                    src={badge.iconUrl} 
-                    alt={badge.badgeName}
-                    style={{ width: '48px', height: '48px', objectFit: 'contain' }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'block';
-                    }}
-                  />
-                ) : null}
-                <div style={{ fontSize: '32px', display: badge.iconUrl ? 'none' : 'block' }}>
-                  🏆
-                </div>
-                <div>
-                  <p style={{ fontWeight: 600, fontSize: '14px', margin: 0 }}>
-                    {badge.badgeName || badge.badgeCode}
-                  </p>
-                  <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0 0' }}>
-                    {badge.badgeDescription || ''}
-                  </p>
-                  {badge.count > 1 && (
-                    <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
-                      Đạt được {badge.count} lần
-                    </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+            {badges.map((badge) => {
+              const typeInfo = getBadgeTypeInfo(badge.badgeType);
+              return (
+                <div
+                  key={badge.badgeCode}
+                  style={{
+                    padding: '16px',
+                    backgroundColor: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px',
+                    position: 'relative',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  {/* Badge Type Label */}
+                  {badge.badgeType && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        color: typeInfo.color,
+                        backgroundColor: typeInfo.bg,
+                      }}
+                    >
+                      {typeInfo.label}
+                    </div>
                   )}
+
+                  {/* Badge Icon */}
+                  <div style={{ position: 'relative', marginTop: badge.badgeType ? '8px' : '0' }}>
+                    {badge.iconUrl ? (
+                      <img 
+                        src={badge.iconUrl} 
+                        alt={badge.badgeName}
+                        style={{ 
+                          width: '64px', 
+                          height: '64px', 
+                          objectFit: 'contain',
+                          borderRadius: '8px',
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          if (e.target.nextSibling) {
+                            e.target.nextSibling.style.display = 'block';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <div 
+                      style={{ 
+                        fontSize: '48px', 
+                        display: badge.iconUrl ? 'none' : 'block',
+                        lineHeight: 1,
+                      }}
+                    >
+                      🏆
+                    </div>
+                    
+                    {/* Count Badge */}
+                    {badge.count && badge.count > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '-4px',
+                          right: '-4px',
+                          minWidth: '24px',
+                          height: '24px',
+                          padding: '0 6px',
+                          borderRadius: '12px',
+                          backgroundColor: '#FF5722',
+                          color: 'white',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '2px solid var(--card-bg)',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                        }}
+                        title={`Đạt được ${badge.count} lần`}
+                      >
+                        {badge.count > 99 ? '99+' : badge.count}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Badge Info */}
+                  <div style={{ width: '100%' }}>
+                    <p style={{ fontWeight: 600, fontSize: '14px', margin: 0, color: 'var(--text-primary)' }}>
+                      {badge.badgeName || badge.badgeCode}
+                    </p>
+                    {badge.badgeDescription && (
+                      <p style={{ fontSize: '12px', color: '#666', margin: '6px 0 0 0', lineHeight: 1.4 }}>
+                        {badge.badgeDescription}
+                      </p>
+                    )}
+                    
+                    {/* Date Info */}
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: '#999' }}>
+                      {badge.firstEarnedAt && (
+                        <div style={{ marginTop: '4px' }}>
+                          🎯 Lần đầu: {formatDateTime(badge.firstEarnedAt)}
+                        </div>
+                      )}
+                      {badge.lastEarnedAt && badge.count > 1 && (
+                        <div style={{ marginTop: '2px' }}>
+                          ⏰ Lần cuối: {formatDateTime(badge.lastEarnedAt)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

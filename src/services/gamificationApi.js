@@ -196,6 +196,14 @@ export const getMyBadges = async () => {
 };
 
 /**
+ * Get all badges in the system (for admin/frontend display)
+ * @returns {Promise<Object>} Badge list response { code, result[], message }
+ */
+export const getAllBadges = async () => {
+    return apiRequest('/badge');
+};
+
+/**
  * Challenge Progress API
  */
 

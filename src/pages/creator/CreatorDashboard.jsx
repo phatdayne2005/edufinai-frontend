@@ -19,6 +19,7 @@ const CreatorDashboard = () => {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [showFilter, setShowFilter] = useState(false);
     const [selectedLesson, setSelectedLesson] = useState(null);
+    const [activeTab, setActiveTab] = useState('challenges'); // 'challenges' or 'lessons'
 
     const STATUSES = ['ALL', 'DRAFT', 'PENDING', 'APPROVED', 'REJECTED'];
 
@@ -280,93 +281,144 @@ const CreatorDashboard = () => {
                 </div>
             )}
 
-            {/* Create Button */}
-            <button
-                onClick={() => navigate('/creator/lesson/new')}
-                style={{
-                    ...styles.addButton,
-                    marginBottom: 20,
-                    width: '100%',
-                    justifyContent: 'center'
-                }}
-            >
-                <Plus size={20} /> Tạo bài học mới
-            </button>
-
-            {/* Filter by Status */}
-            <div style={{ marginBottom: 20 }}>
+            {/* Tab Navigation */}
+            <div style={{
+                display: 'flex',
+                gap: '8px',
+                marginBottom: '20px',
+                borderBottom: '2px solid var(--border-subtle)',
+                paddingBottom: '0'
+            }}>
                 <button
-                    onClick={() => setShowFilter(!showFilter)}
+                    onClick={() => setActiveTab('challenges')}
                     style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '12px 0',
+                        padding: '12px 24px',
                         background: 'transparent',
                         border: 'none',
+                        borderBottom: activeTab === 'challenges' ? '3px solid #2196F3' : '3px solid transparent',
+                        color: activeTab === 'challenges' ? '#2196F3' : 'var(--text-secondary)',
+                        fontWeight: activeTab === 'challenges' ? 600 : 400,
+                        fontSize: '15px',
                         cursor: 'pointer',
-                        fontSize: 15,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        width: '100%',
-                        justifyContent: 'flex-start'
+                        transition: 'all 0.2s',
+                        marginBottom: '-2px'
                     }}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Filter size={20} color="#666" />
-                        Lọc trạng thái
-                    </div>
+                    🎯 Tạo Challenge
                 </button>
-
-                {showFilter && (
-                    <div style={{
-                        marginTop: 12,
-                        padding: '16px',
-                        background: 'var(--surface-card)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 12,
-                        animation: 'fadeIn 0.3s ease-in-out'
-                    }}>
-                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>Trạng thái:</p>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {STATUSES.map(status => (
-                                <button
-                                    key={status}
-                                    onClick={() => setStatusFilter(status)}
-                                    style={{
-                                        padding: '6px 16px',
-                                        borderRadius: 20,
-                                        border: statusFilter === status ? '2px solid #2196F3' : '1px solid var(--border-subtle)',
-                                        background: statusFilter === status ? 'rgba(33, 150, 243, 0.1)' : 'var(--bg-primary)',
-                                        color: statusFilter === status ? '#2196F3' : 'var(--text-secondary)',
-                                        fontSize: 13,
-                                        cursor: 'pointer',
-                                        fontWeight: statusFilter === status ? 600 : 400,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 6
-                                    }}
-                                >
-                                    {status !== 'ALL' && getStatusIcon(status)}
-                                    {status}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <button
+                    onClick={() => setActiveTab('lessons')}
+                    style={{
+                        padding: '12px 24px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: activeTab === 'lessons' ? '3px solid #2196F3' : '3px solid transparent',
+                        color: activeTab === 'lessons' ? '#2196F3' : 'var(--text-secondary)',
+                        fontWeight: activeTab === 'lessons' ? 600 : 400,
+                        fontSize: '15px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        marginBottom: '-2px'
+                    }}
+                >
+                    📝 Tạo Quiz/Bài học
+                </button>
             </div>
 
-            <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>
-                    Danh sách bài học đã tạo ({lessons.length})
-                </h3>
-                {loading ? <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Đang tải...</p> : (
-                    lessons.length === 0 ? (
-                        <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            Bạn chưa tạo bài học nào {statusFilter !== 'ALL' && `với trạng thái ${statusFilter}`}.
-                        </p>
-                    ) : (
-                        lessons.map(lesson => (
+            {/* Tab Content */}
+            {activeTab === 'challenges' ? (
+                <div style={{ marginTop: '20px' }}>
+                    <CreatorChallengeManager />
+                </div>
+            ) : (
+                <>
+                    {/* Create Lesson Button */}
+                    <button
+                        onClick={() => navigate('/creator/lesson/new')}
+                        style={{
+                            ...styles.addButton,
+                            marginBottom: 20,
+                            width: '100%',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <Plus size={20} /> Tạo bài học mới
+                    </button>
+
+                    {/* Filter by Status */}
+                    <div style={{ marginBottom: 20 }}>
+                        <button
+                            onClick={() => setShowFilter(!showFilter)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '12px 0',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: 15,
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                width: '100%',
+                                justifyContent: 'flex-start'
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Filter size={20} color="#666" />
+                                Lọc trạng thái
+                            </div>
+                        </button>
+
+                        {showFilter && (
+                            <div style={{
+                                marginTop: 12,
+                                padding: '16px',
+                                background: 'var(--surface-card)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 12,
+                                animation: 'fadeIn 0.3s ease-in-out'
+                            }}>
+                                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>Trạng thái:</p>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {STATUSES.map(status => (
+                                        <button
+                                            key={status}
+                                            onClick={() => setStatusFilter(status)}
+                                            style={{
+                                                padding: '6px 16px',
+                                                borderRadius: 20,
+                                                border: statusFilter === status ? '2px solid #2196F3' : '1px solid var(--border-subtle)',
+                                                background: statusFilter === status ? 'rgba(33, 150, 243, 0.1)' : 'var(--bg-primary)',
+                                                color: statusFilter === status ? '#2196F3' : 'var(--text-secondary)',
+                                                fontSize: 13,
+                                                cursor: 'pointer',
+                                                fontWeight: statusFilter === status ? 600 : 400,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6
+                                            }}
+                                        >
+                                            {status !== 'ALL' && getStatusIcon(status)}
+                                            {status}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={styles.section}>
+                        <h3 style={styles.sectionTitle}>
+                            Danh sách bài học đã tạo ({lessons.length})
+                        </h3>
+                        {loading ? <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Đang tải...</p> : (
+                            lessons.length === 0 ? (
+                                <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                    Bạn chưa tạo bài học nào {statusFilter !== 'ALL' && `với trạng thái ${statusFilter}`}.
+                                </p>
+                            ) : (
+                                lessons.map(lesson => (
                             <div key={lesson.id} style={{ ...styles.lessonCard, display: 'block', padding: 20 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                                     <h4 style={{
@@ -564,12 +616,12 @@ const CreatorDashboard = () => {
                                     </div>
                                 </div>
                             </div>
-                        ))
-                    )
-                )}
-            </div>
+                                ))
+                            )
+                        )}
+                    </div>
 
-            {selectedLesson && (
+                    {selectedLesson && (
                 <div style={modalStyles.modalOverlay} onClick={() => setSelectedLesson(null)}>
                     <div style={modalStyles.modalContent} onClick={(e) => e.stopPropagation()}>
                         <div style={modalStyles.modalHeader}>
@@ -660,10 +712,8 @@ const CreatorDashboard = () => {
                     </div>
                 </div>
             )}
-        </div>
-
-        <div style={{ marginTop: 32 }}>
-            <CreatorChallengeManager />
+                </>
+            )}
         </div>
         </>
     );

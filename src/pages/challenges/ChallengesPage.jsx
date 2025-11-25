@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Trophy, Award, RefreshCw } from 'lucide-react';
+import { TrendingUp, Trophy, RefreshCw } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
+import { formatDateTime } from '../../utils/formatters';
 import { 
   getLeaderboard, 
   getMyLeaderboardPosition, 
@@ -76,6 +77,88 @@ const isCurrentlyActiveChallenge = (challenge) => {
   if (start && now < start) return false;
   if (end && now > end) return false;
   return true;
+};
+
+// Parse rule JSON và convert sang ngôn ngữ tự nhiên
+const parseRuleToNaturalLanguage = (ruleString) => {
+  if (!ruleString) return 'Không có điều kiện';
+  
+  try {
+    const rule = typeof ruleString === 'string' ? JSON.parse(ruleString) : ruleString;
+    const parts = [];
+    
+    if (rule.eventType) {
+      const eventTypeMap = {
+        'QUIZ': 'Quiz',
+        'EXPENSE': 'Chi tiêu',
+        'GOAL': 'Mục tiêu',
+        'SCENARIO': 'Kịch bản',
+        'STREAK': 'Chuỗi ngày',
+        'CUSTOM': 'Tùy chỉnh'
+      };
+      parts.push(`Loại: ${eventTypeMap[rule.eventType] || rule.eventType}`);
+    }
+    
+    if (rule.action) {
+      const actionMap = {
+        'COMPLETE': 'Hoàn thành',
+        'SAVE': 'Tiết kiệm',
+        'CREATE': 'Tạo mới',
+        'UPDATE': 'Cập nhật'
+      };
+      parts.push(`Hành động: ${actionMap[rule.action] || rule.action}`);
+    }
+    
+    if (rule.minAccuracy !== undefined) {
+      parts.push(`Độ chính xác tối thiểu: ${rule.minAccuracy}%`);
+    }
+    
+    if (rule.maxAccuracy !== undefined) {
+      parts.push(`Độ chính xác tối đa: ${rule.maxAccuracy}%`);
+    }
+    
+    if (rule.minScore !== undefined) {
+      parts.push(`Điểm tối thiểu: ${rule.minScore}`);
+    }
+    
+    if (rule.maxScore !== undefined) {
+      parts.push(`Điểm tối đa: ${rule.maxScore}`);
+    }
+    
+    if (rule.maxProgressPerDay !== undefined && rule.maxProgressPerDay > 0) {
+      parts.push(`Giới hạn mỗi ngày: ${rule.maxProgressPerDay} lần`);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : 'Không có điều kiện';
+  } catch (error) {
+    console.warn('Failed to parse rule:', error);
+    return 'Không thể đọc điều kiện';
+  }
+};
+
+// Format date dễ nhìn
+const formatDateDisplay = (dateString) => {
+  if (!dateString) return 'Không xác định';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Không xác định';
+    return formatDateTime(date);
+  } catch (error) {
+    return 'Không xác định';
+  }
+};
+
+// Get type label
+const getTypeLabel = (type) => {
+  const typeMap = {
+    'QUIZ': '📝 Quiz',
+    'EXPENSE': '💰 Chi tiêu',
+    'GOAL': '🎯 Mục tiêu',
+    'SCENARIO': '🎬 Kịch bản',
+    'STREAK': '🔥 Chuỗi ngày',
+    'CUSTOM': '⚙️ Tùy chỉnh'
+  };
+  return typeMap[type] || type || 'Không xác định';
 };
 
 const ChallengesPage = () => {
@@ -239,8 +322,12 @@ const ChallengesPage = () => {
         id: key,
         title: definition?.title || progress.title || 'Chưa rõ tên',
         description: definition?.description || progress.description || '',
+        type: definition?.type || progress.type,
+        rule: definition?.rule || progress.rule,
         rewardScore: definition?.rewardScore ?? progress.rewardScore ?? 0,
+        rewardBadgeCode: definition?.rewardBadgeCode || progress.rewardBadgeCode,
         scope: definition?.scope || progress.scope,
+        startAt: definition?.startAt || progress.startAt,
         endAt: definition?.endAt || progress.endAt,
         currentProgress: progress.currentProgress || 0,
         targetProgress: progress.targetProgress || 0,
@@ -268,8 +355,12 @@ const ChallengesPage = () => {
         id: normalizeChallengeId(challenge),
         title: challenge.title,
         description: challenge.description,
+        type: challenge.type,
+        rule: challenge.rule,
         rewardScore: challenge.rewardScore || 0,
+        rewardBadgeCode: challenge.rewardBadgeCode,
         scope: challenge.scope,
+        startAt: challenge.startAt,
         endAt: challenge.endAt,
         deadlineLabel: getDeadlineLabel(challenge),
         sortKey: getSortKey(challenge),
@@ -285,9 +376,8 @@ const ChallengesPage = () => {
     ? {
       points: Math.round(myPosition.score || 0),
       rank: myPosition.top > 0 ? myPosition.top : 'N/A',
-      level: Math.floor((myPosition.score || 0) / 1000) + 1,
     }
-    : mockUser || { points: 0, rank: 'N/A', level: 1 };
+    : mockUser || { points: 0, rank: 'N/A' };
 
   return (
     <div style={styles.page}>
@@ -308,13 +398,6 @@ const ChallengesPage = () => {
             <p style={styles.statValue}>
               {userStats.rank === 'N/A' || userStats.rank === -1 ? 'N/A' : `#${userStats.rank}`}
             </p>
-          </div>
-        </div>
-        <div style={styles.statBox}>
-          <Award size={24} color="#2196F3" />
-          <div>
-            <p style={styles.statLabel}>Level</p>
-            <p style={styles.statValue}>{userStats.level}</p>
           </div>
         </div>
       </div>
@@ -379,26 +462,80 @@ const ChallengesPage = () => {
               <div key={challenge.id} style={styles.challengeCard}>
                 <div style={styles.challengeHeader}>
                   <h4 style={styles.challengeTitle}>{challenge.title}</h4>
-                  <span style={styles.challengeReward}>🎁 {challenge.rewardScore} điểm</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    {challenge.rewardScore > 0 && (
+                      <span style={styles.challengeReward}>🎁 {challenge.rewardScore} điểm</span>
+                    )}
+                    {challenge.rewardBadgeCode && (
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: '#FFD700', 
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255, 215, 0, 0.1)'
+                      }}>
+                        🏆 {challenge.rewardBadgeCode}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                
                 {challenge.description && (
                   <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.5 }}>
                     {challenge.description}
                   </p>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-                  <span style={styles.challengeType}>{challenge.deadlineLabel}</span>
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '999px',
-                      border: '1px solid var(--border-subtle)',
-                      fontSize: '12px',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    Chưa tham gia
-                  </span>
+                
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                    {challenge.type && (
+                      <span style={{ 
+                        fontSize: '12px', 
+                        padding: '4px 10px', 
+                        borderRadius: '999px',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        color: '#1d4ed8',
+                        fontWeight: 500
+                      }}>
+                        {getTypeLabel(challenge.type)}
+                      </span>
+                    )}
+                    <span style={styles.challengeType}>{challenge.deadlineLabel}</span>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        border: '1px solid var(--border-subtle)',
+                        fontSize: '12px',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Chưa tham gia
+                    </span>
+                  </div>
+                  
+                  {challenge.rule && (
+                    <div style={{ 
+                      fontSize: '12px', 
+                      color: 'var(--text-secondary)', 
+                      padding: '8px',
+                      backgroundColor: 'var(--surface-muted)',
+                      borderRadius: '6px',
+                      marginTop: '4px'
+                    }}>
+                      <strong>Điều kiện:</strong> {parseRuleToNaturalLanguage(challenge.rule)}
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    {challenge.startAt && (
+                      <div>📅 Bắt đầu: {formatDateDisplay(challenge.startAt)}</div>
+                    )}
+                    {challenge.endAt && (
+                      <div>⏰ Kết thúc: {formatDateDisplay(challenge.endAt)}</div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -425,14 +562,52 @@ const ChallengesPage = () => {
               <div key={challenge.id} style={styles.challengeCard}>
                 <div style={styles.challengeHeader}>
                   <h4 style={styles.challengeTitle}>{challenge.title}</h4>
-                  <span style={styles.challengeReward}>🎁 {challenge.rewardScore} điểm</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    {challenge.rewardScore > 0 && (
+                      <span style={styles.challengeReward}>🎁 {challenge.rewardScore} điểm</span>
+                    )}
+                    {challenge.rewardBadgeCode && (
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: '#FFD700', 
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255, 215, 0, 0.1)'
+                      }}>
+                        🏆 {challenge.rewardBadgeCode}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={styles.challengeType}>{challenge.deadlineLabel}</span>
+                
+                {challenge.description && (
+                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.5 }}>
+                    {challenge.description}
+                  </p>
+                )}
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                    {challenge.type && (
+                      <span style={{ 
+                        fontSize: '12px', 
+                        padding: '4px 10px', 
+                        borderRadius: '999px',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        color: '#1d4ed8',
+                        fontWeight: 500
+                      }}>
+                        {getTypeLabel(challenge.type)}
+                      </span>
+                    )}
+                    <span style={styles.challengeType}>{challenge.deadlineLabel}</span>
+                  </div>
                   <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, ...statusStyle }}>
                     {statusLabel}
                   </span>
                 </div>
+                
                 <div style={styles.challengeProgress}>
                   <div style={styles.progressBar}>
                     <div
@@ -450,11 +625,33 @@ const ChallengesPage = () => {
                     {challenge.currentProgress}/{challenge.targetProgress}
                   </span>
                 </div>
-                {challenge.status === 'COMPLETED' && challenge.completedAt && (
-                  <span style={{ ...styles.challengeType, color: '#047857' }}>
-                    Hoàn thành: {new Date(challenge.completedAt).toLocaleDateString('vi-VN')}
-                  </span>
+                
+                {challenge.rule && (
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: 'var(--text-secondary)', 
+                    padding: '8px',
+                    backgroundColor: 'var(--surface-muted)',
+                    borderRadius: '6px',
+                    marginTop: '8px'
+                  }}>
+                    <strong>Điều kiện:</strong> {parseRuleToNaturalLanguage(challenge.rule)}
+                  </div>
                 )}
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                  {challenge.startAt && (
+                    <div>📅 Bắt đầu: {formatDateDisplay(challenge.startAt)}</div>
+                  )}
+                  {challenge.endAt && (
+                    <div>⏰ Kết thúc: {formatDateDisplay(challenge.endAt)}</div>
+                  )}
+                  {challenge.status === 'COMPLETED' && challenge.completedAt && (
+                    <div style={{ color: '#047857', fontWeight: 500 }}>
+                      ✅ Hoàn thành: {formatDateDisplay(challenge.completedAt)}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })

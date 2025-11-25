@@ -1,11 +1,23 @@
+// Fallback config from public/firebase-config.js values
+// These will be used if environment variables are not set
+const fallbackConfig = {
+    apiKey: "AIzaSyB6RSBn1-Pm8yAbaisI-EPOKO1wqAXyoqw",
+    authDomain: "edufinai-firebase-notification.firebaseapp.com",
+    projectId: "edufinai-firebase-notification",
+    storageBucket: "edufinai-firebase-notification.firebasestorage.app",
+    messagingSenderId: "290466433906",
+    appId: "1:290466433906:web:60c58bd270def9d915ebeb",
+    measurementId: "G-LRP5MCBBZF"
+};
+
 const firebaseConfig = {
-    apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.REACT_APP_FIREBASE_APP_ID,
-    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY || fallbackConfig.apiKey,
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain,
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || fallbackConfig.projectId,
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket,
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || fallbackConfig.messagingSenderId,
+    appId: process.env.REACT_APP_FIREBASE_APP_ID || fallbackConfig.appId,
+    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || fallbackConfig.measurementId,
 };
 
 export const hasFirebaseEnvConfig =
@@ -14,7 +26,7 @@ export const hasFirebaseEnvConfig =
 if (process.env.NODE_ENV !== 'production' && !hasFirebaseEnvConfig) {
     // eslint-disable-next-line no-console
     console.warn(
-        '[Firebase] Missing configuration in environment variables. Please set REACT_APP_FIREBASE_* values.'
+        '[Firebase] Missing configuration in environment variables. Using fallback config from firebase-config.js'
     );
 }
 

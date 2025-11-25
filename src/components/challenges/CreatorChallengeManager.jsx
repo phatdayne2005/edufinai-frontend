@@ -19,6 +19,7 @@ import {
   getChallenges,
   resubmitChallenge,
   updateChallenge,
+  getAllBadges,
 } from '../../services/gamificationApi';
 
 const statusStyles = {
@@ -117,6 +118,8 @@ const CreatorChallengeManager = () => {
   const [editingChallenge, setEditingChallenge] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showFilter, setShowFilter] = useState(false);
+  const [badges, setBadges] = useState([]);
+  const [badgesLoading, setBadgesLoading] = useState(false);
 
   const STATUS_FILTERS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
 
@@ -138,7 +141,22 @@ const CreatorChallengeManager = () => {
 
   useEffect(() => {
     fetchChallenges();
+    fetchBadges();
   }, []);
+
+  const fetchBadges = async () => {
+    try {
+      setBadgesLoading(true);
+      const data = await getAllBadges();
+      const normalized = Array.isArray(data) ? data : data?.result || [];
+      setBadges(normalized);
+    } catch (err) {
+      console.error('Failed to load badges', err);
+      setBadges([]);
+    } finally {
+      setBadgesLoading(false);
+    }
+  };
 
   const myChallenges = useMemo(() => {
     let filtered = challenges;
@@ -688,12 +706,33 @@ const CreatorChallengeManager = () => {
                 </div>
                 <div style={{ flex: 1, minWidth: '160px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 600 }}>Badge (tùy chọn)</label>
-                  <input
-                    type="text"
-                    value={formState.rewardBadgeCode}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, rewardBadgeCode: e.target.value }))}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginTop: '4px' }}
-                  />
+                  <select
+                    value={formState.rewardBadgeCode || ''}
+                    onChange={(e) => setFormState((prev) => ({ ...prev, rewardBadgeCode: e.target.value || '' }))}
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px 12px', 
+                      borderRadius: '12px', 
+                      border: '1px solid var(--border-subtle)', 
+                      marginTop: '4px',
+                      backgroundColor: 'var(--surface-card)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer'
+                    }}
+                    disabled={badgesLoading}
+                  >
+                    <option value="">Không</option>
+                    {badges.map((badge) => (
+                      <option key={badge.id || badge.code} value={badge.code}>
+                        {badge.name || badge.code} {badge.type ? `(${badge.type})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {badgesLoading && (
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', margin: '4px 0 0 0' }}>
+                      Đang tải danh sách badge...
+                    </p>
+                  )}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
