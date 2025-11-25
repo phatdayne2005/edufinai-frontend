@@ -182,7 +182,7 @@ const CreateLessonPage = () => {
 
     const loadSampleQuiz = () => {
         if (window.confirm('Hành động này sẽ thay thế các câu hỏi hiện tại. Bạn có chắc chắn không?')) {
-            setQuizQuestions([
+            const allSampleQuestions = [
                 {
                     question: "Mục đích chính của việc lập ngân sách là gì?",
                     options: [
@@ -232,8 +232,62 @@ const CreateLessonPage = () => {
                         "Bất động sản"
                     ],
                     correctAnswer: 2
+                },
+                {
+                    question: "Quỹ khẩn cấp nên bằng bao nhiêu tháng chi phí sinh hoạt?",
+                    options: [
+                        "1 tháng",
+                        "3-6 tháng",
+                        "1 năm",
+                        "Không cần thiết"
+                    ],
+                    correctAnswer: 1
+                },
+                {
+                    question: "Lạm phát ảnh hưởng như thế nào đến sức mua của tiền?",
+                    options: [
+                        "Làm tăng sức mua",
+                        "Không ảnh hưởng",
+                        "Làm giảm sức mua",
+                        "Làm tiền có giá trị hơn"
+                    ],
+                    correctAnswer: 2
+                },
+                {
+                    question: "Đa dạng hóa danh mục đầu tư giúp ích gì?",
+                    options: [
+                        "Đảm bảo lợi nhuận cao nhất",
+                        "Giảm thiểu rủi ro",
+                        "Không mất phí giao dịch",
+                        "Tăng rủi ro"
+                    ],
+                    correctAnswer: 1
+                },
+                {
+                    question: "Chỉ số P/E trong chứng khoán là gì?",
+                    options: [
+                        "Giá trên thu nhập mỗi cổ phiếu",
+                        "Lợi nhuận trên vốn chủ sở hữu",
+                        "Tổng tài sản của công ty",
+                        "Cổ tức được chia"
+                    ],
+                    correctAnswer: 0
+                },
+                {
+                    question: "Sự khác biệt chính giữa thẻ tín dụng và thẻ ghi nợ là gì?",
+                    options: [
+                        "Thẻ tín dụng dùng tiền của bạn, thẻ ghi nợ vay tiền ngân hàng",
+                        "Thẻ tín dụng vay tiền ngân hàng, thẻ ghi nợ dùng tiền của bạn",
+                        "Không có sự khác biệt",
+                        "Thẻ tín dụng không mất phí"
+                    ],
+                    correctAnswer: 1
                 }
-            ]);
+            ];
+
+            // Shuffle array and pick 5
+            const shuffled = allSampleQuestions.sort(() => 0.5 - Math.random());
+            setQuizQuestions(shuffled.slice(0, 5));
         }
     };
 

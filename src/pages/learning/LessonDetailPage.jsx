@@ -118,7 +118,7 @@ const LessonDetailPage = () => {
         if (enrollment && enrollment.status === 'COMPLETED') {
             return { text: 'Đã hoàn thành', color: '#4CAF50', bgColor: 'rgba(76, 175, 80, 0.1)', border: '#4CAF50' };
         }
-        if (enrollment && enrollment.progressPercent > 0) {
+        if (enrollment) {
             return { text: 'Đang làm', color: '#FF9800', bgColor: 'rgba(255, 152, 0, 0.1)', border: '#FF9800' };
         }
         return { text: 'Chưa bắt đầu', color: '#F44336', bgColor: 'rgba(244, 67, 54, 0.1)', border: '#F44336' };

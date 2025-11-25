@@ -92,7 +92,9 @@ const QuizPage = () => {
     const handleSubmit = async () => {
         let correctCount = 0;
         questions.forEach((q, index) => {
-            if (answers[index] === q.correctAnswer) {
+            // Use loose equality to handle potential string/number mismatches
+            // eslint-disable-next-line eqeqeq
+            if (answers[index] == q.correctAnswer) {
                 correctCount++;
             }
         });
@@ -105,8 +107,8 @@ const QuizPage = () => {
         setScore(earnedPoints);
         setSubmitted(true);
 
-        // Logic pass: Đạt >= 80% số điểm tối đa thì tính là hoàn thành
-        const isPassed = (correctCount / questions.length) >= 0.8;
+        // Logic pass: Đạt 100% số điểm tối đa thì tính là hoàn thành
+        const isPassed = correctCount === questions.length;
 
         // Update progress via new slug-based API
         const token = getToken();
@@ -130,7 +132,7 @@ const QuizPage = () => {
     const currentQuestion = questions[currentQuestionIndex];
     const isLastQuestion = currentQuestionIndex === questions.length - 1;
     const maxPoints = questions.length * 10;
-    const isPassed = (score / maxPoints) >= 0.8;
+    const isPassed = score === maxPoints;
 
     return (
         <div style={styles.page}>

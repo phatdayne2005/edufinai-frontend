@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Award, Filter, DollarSign, TrendingUp, PiggyBank, CreditCard, FileText, HelpCircle, Tag, Circle, AlertCircle, AlertTriangle, BookOpen, Clock, Check } from 'lucide-react';
+import { ChevronRight, Award, Filter, DollarSign, TrendingUp, PiggyBank, CreditCard, FileText, HelpCircle, Tag, Circle, AlertCircle, AlertTriangle, BookOpen, Clock, Check, Swords } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import { useAuth } from '../../context/AuthContext';
 import { learningService } from '../../services/learningService';
@@ -16,28 +16,24 @@ const getDifficultyStyle = (difficulty) => {
       return {
         bg: '#E8F5E9',
         color: '#2E7D32',
-        icon: <Circle size={14} fill="#2E7D32" color="#2E7D32" />,
         text: 'Cơ bản'
       };
     case 'INTERMEDIATE':
       return {
         bg: '#FFF3E0',
         color: '#EF6C00',
-        icon: <AlertCircle size={14} color="#EF6C00" />,
         text: 'Trung bình'
       };
     case 'ADVANCED':
       return {
         bg: '#FFEBEE',
         color: '#C62828',
-        icon: <AlertTriangle size={14} color="#C62828" />,
         text: 'Nâng cao'
       };
     default:
       return {
         bg: '#F5F5F5',
         color: '#666',
-        icon: <Circle size={14} color="#666" />,
         text: difficulty
       };
   }
@@ -55,16 +51,15 @@ const getTagIcon = (tag) => {
 };
 
 const getEnrollmentStatus = (enrollment) => {
-  if (enrollment && (enrollment.status === 'COMPLETED' || enrollment.progressPercent === 100)) {
+  if (!enrollment) {
+    return { text: 'Chưa bắt đầu', color: '#F44336', bgColor: '#FFEBEE' };
+  }
+
+  if (enrollment.status === 'COMPLETED') {
     return { text: 'Đã hoàn thành', color: '#4CAF50', bgColor: '#E8F5E9' };
   }
 
-  if (enrollment && enrollment.progressPercent > 0) {
-    return { text: 'Đang làm', color: '#FF9800', bgColor: '#FFF3E0' };
-  }
-
-  // Gộp cả chưa đăng ký và chưa bắt đầu (progress = 0)
-  return { text: 'Chưa bắt đầu', color: '#F44336', bgColor: '#FFEBEE' };
+  return { text: 'Đang làm', color: '#FF9800', bgColor: '#FFF3E0' };
 };
 
 const getTagColor = (tag) => {
@@ -424,19 +419,18 @@ const LearningPage = () => {
                   {/* Meta info */}
                   <div style={{ fontSize: 12, color: '#888', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     {/* Difficulty Badge */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      backgroundColor: difficultyInfo.bg,
-                      color: difficultyInfo.color,
-                      padding: '4px 10px',
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 600
-                    }}>
-                      {difficultyInfo.icon}
-                      {difficultyInfo.text}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Swords size={14} />
+                      <div style={{
+                        backgroundColor: difficultyInfo.bg,
+                        color: difficultyInfo.color,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>
+                        {difficultyInfo.text}
+                      </div>
                     </div>
 
                     {lesson.tags && lesson.tags.length > 0 && (
