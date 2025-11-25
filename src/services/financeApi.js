@@ -311,6 +311,20 @@ export const deleteGoal = async (id) => {
   });
 };
 
+/**
+ * Get goal transaction history - Lấy lịch sử giao dịch của mục tiêu
+ * GET /finance/v1/goals/{id}/transactions
+ * @param {string} id - Goal ID (UUID)
+ * @returns {Promise<Object>} Goal transaction history (goal info + transactions + summary)
+ */
+export const getGoalTransactionHistory = async (id) => {
+  if (!id) {
+    throw new Error('Goal ID is required');
+  }
+
+  return apiRequest(`/v1/goals/${id}/transactions`);
+};
+
 // ============================================================================
 // Summary APIs
 // ============================================================================

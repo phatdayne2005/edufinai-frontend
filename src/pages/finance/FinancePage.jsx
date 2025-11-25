@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Target, CheckCircle, Loader2, Trash2, TrendingUp, TrendingDown, Settings } from 'lucide-react';
+import { Plus, Target, CheckCircle, Loader2, Trash2, TrendingUp, TrendingDown, Settings, History, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   PieChart,
   Pie,
@@ -26,6 +26,7 @@ import {
   getMonthlySummary,
   confirmGoalCompletion,
   deleteGoal,
+  getGoalTransactionHistory,
 } from '../../services/financeApi';
 import { formatCurrency, formatDateTime, formatDate } from '../../utils/formatters';
 
@@ -65,6 +66,16 @@ const FinancePage = () => {
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [transactionType, setTransactionType] = useState('INCOME');
   const [selectedGoalForTransaction, setSelectedGoalForTransaction] = useState(null);
+  const [showGoalHistoryModal, setShowGoalHistoryModal] = useState(false);
+  const [goalHistoryLoading, setGoalHistoryLoading] = useState(false);
+  const [goalHistoryData, setGoalHistoryData] = useState(null);
+  const [goalHistoryFilter, setGoalHistoryFilter] = useState('DEPOSIT');
+  const [goalHistoryError, setGoalHistoryError] = useState(null);
+  const [goalHistoryGoal, setGoalHistoryGoal] = useState(null);
+
+  // Reports: Expanded categories state
+  const [expandedIncomeCategories, setExpandedIncomeCategories] = useState(new Set());
+  const [expandedExpenseCategories, setExpandedExpenseCategories] = useState(new Set());
 
   const handleTabChange = (nextTab) => {
     if (nextTab === activeTab) return;
@@ -94,6 +105,37 @@ const FinancePage = () => {
       setLoadingTransactions(false);
     }
   }, [dateFilter]);
+
+  // Get current month start and end dates
+  const getCurrentMonthRange = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+    return { startDate, endDate };
+  };
+
+  // Load all transactions for current month (for Reports)
+  const loadCurrentMonthTransactions = useCallback(async () => {
+    try {
+      setLoadingTransactions(true);
+      const { startDate, endDate } = getCurrentMonthRange();
+      const params = {
+        page: 0,
+        size: 1000, // Load large number to get all transactions
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      };
+      const response = await getTransactions(params);
+      // Set transactions for current month (used in Reports)
+      setTransactions(response.content || []);
+    } catch (error) {
+      console.error('Error loading current month transactions:', error);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  }, []);
 
   // Load goals
   const loadGoals = useCallback(async () => {
@@ -128,8 +170,10 @@ const FinancePage = () => {
       loadGoals();
     } else if (activeTab === 'reports') {
       loadSummary();
+      // Load all transactions for current month to show category details
+      loadCurrentMonthTransactions();
     }
-  }, [activeTab, loadTransactions, loadGoals, loadSummary]);
+  }, [activeTab, loadTransactions, loadGoals, loadSummary, loadCurrentMonthTransactions]);
 
   // Handle navigation from HomePage - scroll to goal
   useEffect(() => {
@@ -291,6 +335,37 @@ const FinancePage = () => {
     setShowTransactionModal(true);
   };
 
+  const fetchGoalHistory = useCallback(async (goalId) => {
+    if (!goalId) return;
+    try {
+      setGoalHistoryLoading(true);
+      setGoalHistoryError(null);
+      const data = await getGoalTransactionHistory(goalId);
+      setGoalHistoryData(data);
+    } catch (error) {
+      console.error('Error fetching goal history:', error);
+      setGoalHistoryError(error.message || 'Không thể tải lịch sử giao dịch');
+    } finally {
+      setGoalHistoryLoading(false);
+    }
+  }, []);
+
+  const handleViewGoalHistory = (goal) => {
+    if (!goal) return;
+    setGoalHistoryGoal(goal);
+    setGoalHistoryFilter('DEPOSIT');
+    setGoalHistoryData(null);
+    setShowGoalHistoryModal(true);
+    fetchGoalHistory(goal.goalId);
+  };
+
+  const closeGoalHistoryModal = () => {
+    setShowGoalHistoryModal(false);
+    setGoalHistoryGoal(null);
+    setGoalHistoryData(null);
+    setGoalHistoryError(null);
+  };
+
   const handleSuccess = () => {
     if (activeTab === 'expense') {
       loadTransactions(transactionsPage);
@@ -298,6 +373,10 @@ const FinancePage = () => {
       loadGoals();
     } else if (activeTab === 'reports') {
       loadSummary();
+    }
+
+    if (showGoalHistoryModal && goalHistoryGoal) {
+      fetchGoalHistory(goalHistoryGoal.goalId);
     }
   };
 
@@ -323,8 +402,19 @@ const FinancePage = () => {
     return CATEGORY_COLORS[index];
   };
 
-  // Prepare chart data for reports
-  const spendingByCategory = transactions
+  // Filter transactions for current month
+  const getCurrentMonthTransactions = () => {
+    const { startDate, endDate } = getCurrentMonthRange();
+    return transactions.filter((t) => {
+      const txDate = new Date(t.transactionDate);
+      return txDate >= startDate && txDate <= endDate;
+    });
+  };
+
+  // Prepare chart data for reports (current month only)
+  const currentMonthTransactions = getCurrentMonthTransactions();
+  
+  const spendingByCategory = currentMonthTransactions
     .filter((t) => t.type === 'EXPENSE' && !t.goalId) // Exclude goal deposits
     .reduce((acc, t) => {
       const category = t.category || 'Khác';
@@ -332,7 +422,7 @@ const FinancePage = () => {
       return acc;
     }, {});
 
-  const incomeByCategory = transactions
+  const incomeByCategory = currentMonthTransactions
     .filter((t) => t.type === 'INCOME' && !t.goalId) // Only regular income, exclude goal deposits
     .reduce((acc, t) => {
       const category = t.category || 'Khác';
@@ -355,6 +445,34 @@ const FinancePage = () => {
         color: getCategoryColor(name),
       }))
       .sort((a, b) => b.value - a.value), // Sort by value descending
+  };
+
+  // Get transactions by category for current month
+  const getTransactionsByCategory = (categoryName, type) => {
+    return currentMonthTransactions.filter(
+      (t) => (t.category || 'Khác') === categoryName && t.type === type && !t.goalId
+    );
+  };
+
+  // Toggle expanded category
+  const toggleIncomeCategory = (categoryName) => {
+    const newSet = new Set(expandedIncomeCategories);
+    if (newSet.has(categoryName)) {
+      newSet.delete(categoryName);
+    } else {
+      newSet.add(categoryName);
+    }
+    setExpandedIncomeCategories(newSet);
+  };
+
+  const toggleExpenseCategory = (categoryName) => {
+    const newSet = new Set(expandedExpenseCategories);
+    if (newSet.has(categoryName)) {
+      newSet.delete(categoryName);
+    } else {
+      newSet.add(categoryName);
+    }
+    setExpandedExpenseCategories(newSet);
   };
 
   return (
@@ -567,6 +685,7 @@ const FinancePage = () => {
                     ? parseFloat(goal.amount) || 0 
                     : (goal.amount || 0);
                   const progress = amount > 0 ? (savedAmount / amount) * 100 : 0;
+                  const canWithdraw = savedAmount > 0;
                   
                   const statusLabels = {
                     ACTIVE: 'Đang thực hiện',
@@ -637,16 +756,32 @@ const FinancePage = () => {
                               </button>
                             )}
                             
-                            {/* Rút tiền: Hiển thị khi có tiền (savedAmount > 0), kể cả khi đã đủ tiền nhưng chưa xác nhận */}
-                            {savedAmount > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => handleWithdraw(goal)}
-                                className="px-4 py-2 rounded-xl border border-border bg-background text-text-primary font-medium hover:bg-muted transition-colors"
-                              >
-                                Rút tiền
-                              </button>
-                            )}
+                            {/* Rút tiền: luôn hiển thị để giữ bố cục, disable khi chưa có tiền */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!canWithdraw) return;
+                                handleWithdraw(goal);
+                              }}
+                              disabled={!canWithdraw}
+                              className={`px-4 py-2 rounded-xl border font-medium transition-colors ${
+                                canWithdraw
+                                  ? 'border-border bg-background text-text-primary hover:bg-muted'
+                                  : 'border-dashed border-border text-text-muted bg-muted/40 cursor-not-allowed opacity-60'
+                              }`}
+                            >
+                              Rút tiền
+                            </button>
+                            
+                            {/* Lịch sử giao dịch: luôn hiển thị để người dùng xem lịch sử */}
+                            <button
+                              type="button"
+                              onClick={() => handleViewGoalHistory(goal)}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-pink-600 text-white font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                            >
+                              <History size={16} />
+                              Xem lịch sử giao dịch
+                            </button>
                             
                             {/* Xóa mục tiêu: Luôn hiển thị khi chưa COMPLETED */}
                             <button
@@ -658,6 +793,18 @@ const FinancePage = () => {
                               Xóa mục tiêu
                             </button>
                           </>
+                        )}
+
+                        {/* Goal đã hoàn thành vẫn cần xem lịch sử */}
+                        {goal.status === 'COMPLETED' && (
+                          <button
+                            type="button"
+                            onClick={() => handleViewGoalHistory(goal)}
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-pink-600 text-white font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                          >
+                            <History size={16} />
+                            Xem lịch sử giao dịch
+                          </button>
                         )}
                         
                         {/* Hiển thị nút xác nhận hoàn thành khi goal đủ tiền nhưng chưa xác nhận */}
@@ -704,61 +851,213 @@ const FinancePage = () => {
                   </div>
                 </div>
 
-                {/* Income Chart */}
+                {/* Income Chart with Category Panel */}
                 {chartData.income.length > 0 && (
                   <div className="p-6 rounded-xl bg-card border border-border">
                     <h4 className="text-lg font-semibold text-text-primary mb-4">Thu nhập theo danh mục</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={chartData.income}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={5}
-                          dataKey="value"
-                          label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
-                        >
-                          {chartData.income.map((entry) => (
-                            <Cell key={`income-${entry.name}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
-                        <Legend 
-                          formatter={(value, entry) => `${value}: ${formatCurrency(entry.payload.value)}`}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Donut Chart - Left */}
+                      <div className="flex items-center justify-center">
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={chartData.income}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {chartData.income.map((entry) => (
+                                <Cell key={`income-${entry.name}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => formatCurrency(value)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Category Panel - Right */}
+                      <div className="border-l border-border pl-6">
+                        <h5 className="text-lg font-semibold text-text-primary mb-4">Danh mục con</h5>
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                          {chartData.income.map((category) => {
+                            const isExpanded = expandedIncomeCategories.has(category.name);
+                            const categoryTransactions = getTransactionsByCategory(category.name, 'INCOME');
+                            
+                            return (
+                              <div key={`income-cat-${category.name}`} className="border border-border rounded-lg overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleIncomeCategory(category.name)}
+                                  className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <div
+                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: category.color }}
+                                      />
+                                      <span className="font-medium text-text-primary truncate">{category.name}</span>
+                                    </div>
+                                    <p className="text-sm font-semibold text-success ml-5">
+                                      {formatCurrency(category.value)}
+                                    </p>
+                                  </div>
+                                  <div className="flex-shrink-0 ml-2">
+                                    {isExpanded ? (
+                                      <ChevronDown size={20} className="text-text-muted" />
+                                    ) : (
+                                      <ChevronRight size={20} className="text-text-muted" />
+                                    )}
+                                  </div>
+                                </button>
+
+                                {/* Expanded Transaction Details */}
+                                {isExpanded && (
+                                  <div className="border-t border-border bg-muted/20 p-3 space-y-2 max-h-[300px] overflow-y-auto">
+                                    {categoryTransactions.length === 0 ? (
+                                      <p className="text-sm text-text-muted text-center py-2">Chưa có giao dịch nào</p>
+                                    ) : (
+                                      categoryTransactions.map((tx) => (
+                                        <div
+                                          key={tx.transactionId}
+                                          className="bg-background rounded-lg p-3 border border-border"
+                                        >
+                                          <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-medium text-text-primary">{tx.name}</p>
+                                              <p className="text-xs text-text-muted mt-1">
+                                                {formatDateTime(tx.transactionDate)}
+                                              </p>
+                                            </div>
+                                            <p className="text-sm font-semibold text-success whitespace-nowrap">
+                                              +{formatCurrency(tx.amount)}
+                                            </p>
+                                          </div>
+                                          {tx.note && (
+                                            <p className="text-xs text-text-muted italic mt-2">Ghi chú: {tx.note}</p>
+                                          )}
+                                          <p className="text-xs text-text-muted mt-1">
+                                            Thời gian: {formatDateTime(tx.transactionDate)}
+                                          </p>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Expense Chart */}
+                {/* Expense Chart with Category Panel */}
                 {chartData.spending.length > 0 && (
                   <div className="p-6 rounded-xl bg-card border border-border">
                     <h4 className="text-lg font-semibold text-text-primary mb-4">Chi tiêu theo danh mục</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={chartData.spending}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={5}
-                          dataKey="value"
-                          label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
-                        >
-                          {chartData.spending.map((entry) => (
-                            <Cell key={`spending-${entry.name}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
-                        <Legend 
-                          formatter={(value, entry) => `${value}: ${formatCurrency(entry.payload.value)}`}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Donut Chart - Left */}
+                      <div className="flex items-center justify-center">
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={chartData.spending}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {chartData.spending.map((entry) => (
+                                <Cell key={`spending-${entry.name}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => formatCurrency(value)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Category Panel - Right */}
+                      <div className="border-l border-border pl-6">
+                        <h5 className="text-lg font-semibold text-text-primary mb-4">Danh mục cha</h5>
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                          {chartData.spending.map((category) => {
+                            const isExpanded = expandedExpenseCategories.has(category.name);
+                            const categoryTransactions = getTransactionsByCategory(category.name, 'EXPENSE');
+                            
+                            return (
+                              <div key={`expense-cat-${category.name}`} className="border border-border rounded-lg overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpenseCategory(category.name)}
+                                  className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <div
+                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: category.color }}
+                                      />
+                                      <span className="font-medium text-text-primary truncate">{category.name}</span>
+                                    </div>
+                                    <p className="text-sm font-semibold text-danger ml-5">
+                                      {formatCurrency(category.value)}
+                                    </p>
+                                  </div>
+                                  <div className="flex-shrink-0 ml-2">
+                                    {isExpanded ? (
+                                      <ChevronDown size={20} className="text-text-muted" />
+                                    ) : (
+                                      <ChevronRight size={20} className="text-text-muted" />
+                                    )}
+                                  </div>
+                                </button>
+
+                                {/* Expanded Transaction Details */}
+                                {isExpanded && (
+                                  <div className="border-t border-border bg-muted/20 p-3 space-y-2 max-h-[300px] overflow-y-auto">
+                                    {categoryTransactions.length === 0 ? (
+                                      <p className="text-sm text-text-muted text-center py-2">Chưa có giao dịch nào</p>
+                                    ) : (
+                                      categoryTransactions.map((tx) => (
+                                        <div
+                                          key={tx.transactionId}
+                                          className="bg-background rounded-lg p-3 border border-border"
+                                        >
+                                          <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-medium text-text-primary">{tx.name}</p>
+                                              <p className="text-xs text-text-muted mt-1">
+                                                {formatDateTime(tx.transactionDate)}
+                                              </p>
+                                            </div>
+                                            <p className="text-sm font-semibold text-danger whitespace-nowrap">
+                                              -{formatCurrency(tx.amount)}
+                                            </p>
+                                          </div>
+                                          {tx.note && (
+                                            <p className="text-xs text-text-muted italic mt-2">Ghi chú: {tx.note}</p>
+                                          )}
+                                          <p className="text-xs text-text-muted mt-1">
+                                            Thời gian: {formatDateTime(tx.transactionDate)}
+                                          </p>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -868,6 +1167,134 @@ const FinancePage = () => {
         onClose={() => setShowCategoryModal(false)}
         onSuccess={handleSuccess}
       />
+      {showGoalHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8">
+          <div className="w-full max-w-2xl rounded-2xl bg-card border border-border shadow-2xl">
+            <div className="flex items-start justify-between border-b border-border px-6 py-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-text-muted">Lịch sử giao dịch</p>
+                <h3 className="text-xl font-semibold text-text-primary">
+                  {`Lịch sử giao dịch — ${goalHistoryData?.goalTitle || goalHistoryGoal?.title || ''}`}
+                </h3>
+                <p className="text-sm text-text-muted">
+                  {goalHistoryData
+                    ? `${formatCurrency(goalHistoryData.savedAmount)} / ${formatCurrency(goalHistoryData.goalAmount)}`
+                    : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeGoalHistoryModal}
+                className="text-text-muted hover:text-text-primary text-2xl leading-none"
+                aria-label="Đóng"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              <div className="flex gap-2">
+                {[
+                  { id: 'DEPOSIT', label: 'Nạp', type: 'INCOME' },
+                  { id: 'WITHDRAWAL', label: 'Rút', type: 'WITHDRAWAL' },
+                ].map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setGoalHistoryFilter(filter.id)}
+                    className={`flex-1 px-4 py-2 rounded-xl border font-medium transition-colors ${
+                      goalHistoryFilter === filter.id
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-background text-text-primary hover:bg-muted'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+
+              {goalHistoryLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 size={32} className="animate-spin text-primary" />
+                </div>
+              ) : goalHistoryError ? (
+                <p className="text-center text-danger py-8">{goalHistoryError}</p>
+              ) : (
+                <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
+                  {(() => {
+                    const transactions =
+                      goalHistoryData?.transactions?.filter((tx) =>
+                        goalHistoryFilter === 'DEPOSIT' ? tx.type === 'INCOME' : tx.type === 'WITHDRAWAL'
+                      ) || [];
+
+                    if (transactions.length === 0) {
+                      return <p className="text-center text-text-muted py-8">Chưa có giao dịch nào</p>;
+                    }
+
+                    return transactions.map((tx) => (
+                      <div
+                        key={tx.transactionId}
+                        className="rounded-xl border border-border bg-background/80 p-4 hover:border-primary/40 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-semibold text-text-primary">{tx.name || (tx.type === 'INCOME' ? 'Nạp tiền' : 'Rút tiền')}</p>
+                            <p className="text-sm text-text-muted">{formatDateTime(tx.transactionDate)}</p>
+                            {tx.categoryName && (
+                              <p className="text-xs text-text-muted mt-1">Danh mục: {tx.categoryName}</p>
+                            )}
+                            {tx.note && <p className="text-xs text-text-muted italic mt-1">Ghi chú: {tx.note}</p>}
+                          </div>
+                          <div className="text-right">
+                            <span
+                              className={`text-sm font-medium px-2 py-1 rounded-full ${
+                                tx.type === 'INCOME' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                              }`}
+                            >
+                              {tx.type === 'INCOME' ? 'Nạp' : 'Rút'}
+                            </span>
+                            <p
+                              className={`mt-2 text-lg font-bold ${
+                                tx.type === 'INCOME' ? 'text-success' : 'text-danger'
+                              }`}
+                            >
+                              {tx.type === 'INCOME' ? '+' : '-'}
+                              {formatCurrency(tx.amount)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+
+              {goalHistoryData?.summary && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border pt-4">
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <p className="text-xs text-text-muted uppercase mb-1">Tổng nạp</p>
+                    <p className="text-lg font-semibold text-success">
+                      {formatCurrency(goalHistoryData.summary.totalDeposit)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <p className="text-xs text-text-muted uppercase mb-1">Tổng rút</p>
+                    <p className="text-lg font-semibold text-danger">
+                      {formatCurrency(goalHistoryData.summary.totalWithdrawal)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <p className="text-xs text-text-muted uppercase mb-1">Số giao dịch</p>
+                    <p className="text-lg font-semibold text-text-primary">
+                      {goalHistoryData.summary.transactionCount}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -596,6 +596,195 @@ GET /finance/v1/transactions?page=0&size=20&startDate=2025-01-01T00:00:00&endDat
 
 ---
 
+#### 3.4. Lấy giao dịch theo danh mục
+
+**Endpoint:** `GET /finance/v1/categories/{id}/transactions` (qua Gateway)  
+**Service Endpoint:** `GET /api/v1/categories/{id}/transactions` (internal)
+
+**Mô tả:** Lấy tất cả transactions của một category trong khoảng thời gian cụ thể, kèm theo thống kê tổng hợp.
+
+**Authentication:** Required (JWT)
+
+**Path Parameters:**
+- `id` (UUID, required): ID của category cần lấy transactions
+
+**Query Parameters:**
+- `month` (Integer, optional): Tháng (1-12), mặc định = tháng hiện tại
+- `year` (Integer, optional): Năm (2024, 2025...), mặc định = năm hiện tại
+- `page` (Integer, optional): Số trang (0-based), mặc định = 0
+- `size` (Integer, optional): Số items mỗi trang, mặc định = 20
+
+**Response 200 OK:**
+```json
+{
+  "categoryId": "c1d2e3f4-0000-0000-0000-000000000000",
+  "categoryName": "Ăn uống",
+  "categoryType": "EXPENSE",
+  "period": {
+    "month": 11,
+    "year": 2025,
+    "startDate": "2025-11-01",
+    "endDate": "2025-11-30"
+  },
+  "summary": {
+    "totalAmount": 2000000.00,
+    "transactionCount": 15,
+    "averageAmount": 133333.33
+  },
+  "transactions": [
+    {
+      "transactionId": "t1a2b3c4-0000-0000-0000-000000000000",
+      "type": "EXPENSE",
+      "name": "Ăn trưa",
+      "category": "Ăn uống",
+      "note": "Cơm văn phòng",
+      "amount": 100000.00,
+      "transactionDate": "2025-11-20T12:00:00",
+      "goalId": null
+    },
+    {
+      "transactionId": "t2b3c4d5-0000-0000-0000-000000000001",
+      "type": "EXPENSE",
+      "name": "Ăn sáng",
+      "category": "Ăn uống",
+      "note": "Phở bò",
+      "amount": 50000.00,
+      "transactionDate": "2025-11-20T08:30:00",
+      "goalId": null
+    }
+  ]
+}
+```
+
+**Business Logic:**
+
+1. **Authorization:**
+   - Chỉ cho phép xem transactions của category thuộc về user (categoryUserId == userId)
+   - Hoặc default categories (isDefault = true) - tất cả user có thể xem
+
+2. **Period Calculation:**
+   - Nếu không truyền `month` hoặc `year` → Mặc định lấy tháng hiện tại
+   - `startDate` = Ngày đầu tháng (00:00:00)
+   - `endDate` = Ngày cuối tháng (23:59:59)
+
+3. **Transaction Filtering:**
+   - Chỉ lấy transactions có `status = "ACTIVE"`
+   - Filter theo `categoryId` và khoảng thời gian (`transactionDate` between `startDate` and `endDate`)
+   - Sắp xếp theo `transactionDate` DESC (mới nhất trước)
+
+4. **Summary Calculation:**
+   - `totalAmount`: Tổng số tiền của tất cả transactions
+   - `transactionCount`: Số lượng transactions
+   - `averageAmount`: Trung bình số tiền (`totalAmount` / `transactionCount`), làm tròn 2 chữ số thập phân
+
+5. **Pagination:**
+   - In-memory pagination sau khi filter và sort
+   - Trả về subset theo `page` và `size`
+
+**Example Requests:**
+
+**1. Lấy transactions của tháng hiện tại (qua Gateway):**
+```bash
+curl -X GET "http://localhost:8080/finance/v1/categories/c1d2e3f4-0000-0000-0000-000000000000/transactions" \
+  -H "Authorization: Bearer <jwt-token>"
+```
+
+**2. Lấy transactions của tháng 10/2025:**
+```bash
+curl -X GET "http://localhost:8080/finance/v1/categories/c1d2e3f4-0000-0000-0000-000000000000/transactions?month=10&year=2025" \
+  -H "Authorization: Bearer <jwt-token>"
+```
+
+**3. Phân trang (page 1, size 10):**
+```bash
+curl -X GET "http://localhost:8080/finance/v1/categories/c1d2e3f4-0000-0000-0000-000000000000/transactions?page=1&size=10" \
+  -H "Authorization: Bearer <jwt-token>"
+```
+
+**Error Responses:**
+
+| Status Code | Mô tả | Response Body |
+|-------------|-------|---------------|
+| 400 | Invalid month/year | `{"timestamp": "...", "status": 400, "error": "Bad Request", "message": "Invalid month or year"}` |
+| 401 | Unauthorized | `{"timestamp": "...", "status": 401, "error": "Unauthorized", "message": "Full authentication is required..."}` |
+| 403 | Forbidden (không có quyền xem category này) | `{"timestamp": "...", "status": 403, "error": "Forbidden", "message": "Forbidden: Cannot view other user's category"}` |
+| 404 | Category không tồn tại | `{"timestamp": "...", "status": 404, "error": "Not Found", "message": "Category not found"}` |
+| 500 | Lỗi server nội bộ | `{"timestamp": "...", "status": 500, "error": "Internal Server Error", "message": "..."}` |
+
+**Use Cases:**
+
+1. **Thu nhập theo danh mục (Income Categories):**
+   - User click vào category "Lương" trong "Thu nhập theo danh mục"
+   - Frontend gọi API với `categoryId` của "Lương"
+   - Response trả về tất cả transactions thu nhập (INCOME) của category "Lương" trong tháng
+
+2. **Chi tiêu theo danh mục (Expense Categories):**
+   - User click vào category "Ăn uống" trong "Chi tiêu theo danh mục"
+   - Frontend gọi API với `categoryId` của "Ăn uống"
+   - Response trả về tất cả transactions chi tiêu (EXPENSE) của category "Ăn uống" trong tháng
+
+**Frontend Integration Example:**
+
+```javascript
+// React/TypeScript example
+async function handleCategoryClick(categoryId: string) {
+  try {
+    const token = localStorage.getItem('jwt');
+    const response = await fetch(
+      `http://localhost:8080/finance/v1/categories/${categoryId}/transactions`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch category transactions');
+    }
+    
+    const data = await response.json();
+    
+    // Hiển thị modal với:
+    // - Tiêu đề: "Giao dịch - {data.categoryName}"
+    // - Tổng: {data.summary.totalAmount} đ
+    // - Số lượng: {data.summary.transactionCount} giao dịch
+    // - Trung bình: {data.summary.averageAmount} đ/giao dịch
+    // - Danh sách: {data.transactions}
+    
+    openTransactionModal(data);
+  } catch (error) {
+    console.error('Error:', error);
+    showErrorMessage('Không thể tải giao dịch');
+  }
+}
+
+// Filter theo tháng
+async function handleMonthChange(categoryId: string, month: number, year: number) {
+  const token = localStorage.getItem('jwt');
+  const response = await fetch(
+    `http://localhost:8080/finance/v1/categories/${categoryId}/transactions?month=${month}&year=${year}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }
+  );
+  
+  const data = await response.json();
+  updateTransactionList(data);
+}
+```
+
+**Lưu ý quan trọng:**
+- ✅ Endpoint này CHỈ lấy transactions có `status = "ACTIVE"` (không lấy transactions đã xóa)
+- ✅ Transactions được sắp xếp theo ngày mới nhất trước
+- ✅ Pagination là in-memory (đủ cho < 1000 transactions/category/month)
+- ✅ Nếu category không có transactions trong tháng → `transactions` là array rỗng `[]`, `totalAmount` = 0, `transactionCount` = 0
+- ⚠️ Đối với categories có rất nhiều transactions (> 1000), có thể cần implement database-level pagination trong tương lai
+
+---
+
 ### 4. Goal Management (Quản lý Mục tiêu Tài chính)
 
 #### 4.1. Tạo mục tiêu mới
@@ -897,6 +1086,422 @@ curl -X DELETE http://localhost:8080/finance/v1/goals/a12b34c5-0000-0000-0000-00
   - Xóa tất cả 3 transaction liên quan
   - Xóa goal
   - Số dư tự động đúng vì transaction đã bị xóa (không còn tính vào số dư)
+
+---
+
+#### 4.6. Lấy lịch sử giao dịch của mục tiêu
+
+**Endpoint:** `GET /finance/v1/goals/{id}/transactions` (qua Gateway)  
+**Service Endpoint:** `GET /api/v1/goals/{id}/transactions` (internal)
+
+**Mô tả:** Lấy lịch sử tất cả giao dịch (nạp/rút) của một mục tiêu cụ thể. API này hiển thị đầy đủ thông tin goal và danh sách giao dịch, phù hợp cho trang "Lịch sử giao dịch - {Tên mục tiêu}".
+
+**Authentication:** Required (JWT)
+
+**Path Parameters:**
+- `id` (UUID, required): ID của mục tiêu
+
+**Response 200 OK:**
+```json
+{
+  "goalTitle": "Mua xe",
+  "goalAmount": 50000000.00,
+  "savedAmount": 20000000.00,
+  "transactions": [
+    {
+      "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "INCOME",
+      "name": "Nạp tiền vào mục tiêu \"Mua xe\"",
+      "categoryName": "Tiết kiệm",
+      "note": "Lương tháng 11",
+      "amount": 5000000.00,
+      "transactionDate": "2025-11-20T14:30:00",
+      "goalId": "660e8400-e29b-41d4-a716-446655440001"
+    },
+    {
+      "transactionId": "550e8400-e29b-41d4-a716-446655440002",
+      "type": "WITHDRAWAL",
+      "name": "Rút tiền từ mục tiêu \"Mua xe\"",
+      "categoryName": "Rút tiền",
+      "note": "Cần tiền gấp",
+      "amount": 1000000.00,
+      "transactionDate": "2025-11-15T10:00:00",
+      "goalId": "660e8400-e29b-41d4-a716-446655440001"
+    }
+  ],
+  "summary": {
+    "totalDeposit": 25000000.00,
+    "totalWithdrawal": 5000000.00,
+    "transactionCount": 15
+  }
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `goalTitle` | String | Tên mục tiêu |
+| `goalAmount` | BigDecimal | Số tiền mục tiêu |
+| `savedAmount` | BigDecimal | Số tiền đã tiết kiệm |
+| **transactions** | Array | Danh sách giao dịch |
+| `transactions[].transactionId` | UUID | ID giao dịch |
+| `transactions[].type` | String (Enum) | Loại: `INCOME` (nạp) hoặc `WITHDRAWAL` (rút) |
+| `transactions[].name` | String | Tên giao dịch |
+| `transactions[].categoryName` | String/null | Tên danh mục |
+| `transactions[].note` | String/null | Ghi chú |
+| `transactions[].amount` | BigDecimal | Số tiền |
+| `transactions[].transactionDate` | DateTime (ISO 8601) | Ngày giờ giao dịch |
+| `transactions[].goalId` | UUID | ID mục tiêu |
+| **summary** | Object | Tổng hợp |
+| `summary.totalDeposit` | BigDecimal | Tổng số tiền đã nạp |
+| `summary.totalWithdrawal` | BigDecimal | Tổng số tiền đã rút |
+| `summary.transactionCount` | Integer | Tổng số giao dịch |
+
+**Business Logic:**
+1. Kiểm tra goal tồn tại và thuộc về user (nếu không → 404 hoặc 403)
+2. Lấy tất cả transactions có `goal_id = {id}` và `status = "ACTIVE"`
+3. Sắp xếp theo `transactionDate` giảm dần (mới nhất trước)
+4. Tính tổng:
+   - `totalDeposit`: Tổng các giao dịch INCOME
+   - `totalWithdrawal`: Tổng các giao dịch WITHDRAWAL
+   - `transactionCount`: Số lượng giao dịch
+5. Trả về thông tin goal + transactions + summary
+
+**Lưu ý:**
+- Chỉ trả về transactions có `status = "ACTIVE"` (không bao gồm đã xóa)
+- Sắp xếp mặc định: Ngày mới nhất lên đầu
+- API này tối ưu cho trang "Lịch sử giao dịch" với tiêu đề: "Lịch sử giao dịch - {goalTitle}"
+
+**Error Responses:**
+
+| Status Code | Mô tả | Response Body |
+|-------------|-------|---------------|
+| 401 | Unauthorized | `{"timestamp": "...", "status": 401, "error": "Unauthorized", "message": "Full authentication is required..."}` |
+| 403 | Forbidden (user không sở hữu goal này) | `{"timestamp": "...", "status": 403, "error": "Forbidden", "message": "Forbidden"}` |
+| 404 | Goal không tồn tại | `{"timestamp": "...", "status": 404, "error": "Not Found", "message": "Goal not found"}` |
+| 500 | Lỗi server nội bộ | `{"timestamp": "...", "status": 500, "error": "Internal Server Error", "message": "..."}` |
+
+**Example Request (qua Gateway):**
+```bash
+curl -X GET http://localhost:8080/finance/v1/goals/660e8400-e29b-41d4-a716-446655440001/transactions \
+  -H "Authorization: Bearer eyJhbGciOiJIUzUxMiJ9..."
+```
+
+**Example Request (trực tiếp service - chỉ dùng cho testing):**
+```bash
+curl -X GET http://localhost:8202/api/v1/goals/660e8400-e29b-41d4-a716-446655440001/transactions \
+  -H "Authorization: Bearer eyJhbGciOiJIUzUxMiJ9..."
+```
+
+**Frontend Integration Example (JavaScript):**
+
+```javascript
+// Service function
+async function getGoalTransactionHistory(goalId) {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(
+    `http://localhost:8080/finance/v1/goals/${goalId}/transactions`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+// Sử dụng trong component
+async function showTransactionHistory(goalId) {
+  try {
+    const history = await getGoalTransactionHistory(goalId);
+    
+    // Hiển thị tiêu đề
+    document.getElementById('page-title').textContent = 
+      `Lịch sử giao dịch - ${history.goalTitle}`;
+    
+    // Hiển thị thông tin goal
+    document.getElementById('goal-amount').textContent = 
+      history.goalAmount.toLocaleString('vi-VN') + ' đ';
+    document.getElementById('saved-amount').textContent = 
+      history.savedAmount.toLocaleString('vi-VN') + ' đ';
+    
+    // Hiển thị summary
+    document.getElementById('total-deposit').textContent = 
+      history.summary.totalDeposit.toLocaleString('vi-VN') + ' đ';
+    document.getElementById('total-withdrawal').textContent = 
+      history.summary.totalWithdrawal.toLocaleString('vi-VN') + ' đ';
+    document.getElementById('transaction-count').textContent = 
+      history.summary.transactionCount + ' giao dịch';
+    
+    // Hiển thị danh sách transactions
+    renderTransactions(history.transactions);
+    
+  } catch (error) {
+    console.error('Lỗi:', error);
+    alert('Không thể tải lịch sử giao dịch');
+  }
+}
+
+// Render transactions
+function renderTransactions(transactions) {
+  const container = document.getElementById('transactions-list');
+  container.innerHTML = '';
+  
+  transactions.forEach(tx => {
+    const item = document.createElement('div');
+    item.className = 'transaction-item';
+    item.innerHTML = `
+      <div class="tx-icon">${tx.type === 'INCOME' ? '⬇️' : '⬆️'}</div>
+      <div class="tx-info">
+        <div class="tx-name">${tx.name}</div>
+        <div class="tx-date">
+          ${new Date(tx.transactionDate).toLocaleDateString('vi-VN')}
+        </div>
+      </div>
+      <div class="tx-amount ${tx.type === 'INCOME' ? 'income' : 'withdrawal'}">
+        ${tx.type === 'INCOME' ? '+' : '-'}
+        ${tx.amount.toLocaleString('vi-VN')} đ
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+```
+
+**React Example:**
+
+```jsx
+import { useState, useEffect } from 'react';
+
+function GoalTransactionHistory({ goalId }) {
+  const [history, setHistory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadHistory();
+  }, [goalId]);
+
+  const loadHistory = async () => {
+    try {
+      const data = await getGoalTransactionHistory(goalId);
+      setHistory(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div>Đang tải...</div>;
+  if (error) return <div className="error">{error}</div>;
+  if (!history) return null;
+
+  return (
+    <div className="transaction-history">
+      {/* Header */}
+      <h1>Lịch sử giao dịch - {history.goalTitle}</h1>
+      
+      {/* Goal Info */}
+      <div className="goal-info">
+        <div className="info-item">
+          <span>Mục tiêu:</span>
+          <span>{history.goalAmount.toLocaleString('vi-VN')} đ</span>
+        </div>
+        <div className="info-item">
+          <span>Đã tiết kiệm:</span>
+          <span>{history.savedAmount.toLocaleString('vi-VN')} đ</span>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="summary">
+        <div className="summary-item">
+          <span>Tổng nạp:</span>
+          <span className="income">
+            {history.summary.totalDeposit.toLocaleString('vi-VN')} đ
+          </span>
+        </div>
+        <div className="summary-item">
+          <span>Tổng rút:</span>
+          <span className="withdrawal">
+            {history.summary.totalWithdrawal.toLocaleString('vi-VN')} đ
+          </span>
+        </div>
+        <div className="summary-item">
+          <span>Số giao dịch:</span>
+          <span>{history.summary.transactionCount}</span>
+        </div>
+      </div>
+
+      {/* Transactions List */}
+      <div className="transactions-list">
+        <h3>Danh sách giao dịch</h3>
+        {history.transactions.length === 0 ? (
+          <div className="empty">Chưa có giao dịch nào</div>
+        ) : (
+          history.transactions.map(tx => (
+            <div key={tx.transactionId} className="transaction-item">
+              <div className="tx-icon">
+                {tx.type === 'INCOME' ? '⬇️' : '⬆️'}
+              </div>
+              <div className="tx-info">
+                <div className="tx-name">{tx.name}</div>
+                <div className="tx-date">
+                  {new Date(tx.transactionDate).toLocaleDateString('vi-VN')}
+                </div>
+                {tx.note && <div className="tx-note">{tx.note}</div>}
+              </div>
+              <div className={`tx-amount ${tx.type === 'INCOME' ? 'income' : 'withdrawal'}`}>
+                {tx.type === 'INCOME' ? '+' : '-'}
+                {tx.amount.toLocaleString('vi-VN')} đ
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+**Vue 3 Example:**
+
+```vue
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const props = defineProps({
+  goalId: String
+});
+
+const history = ref(null);
+const loading = ref(true);
+const error = ref(null);
+
+onMounted(async () => {
+  await loadHistory();
+});
+
+async function loadHistory() {
+  try {
+    const data = await getGoalTransactionHistory(props.goalId);
+    history.value = data;
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    loading.value = false;
+  }
+}
+</script>
+
+<template>
+  <div class="transaction-history">
+    <div v-if="loading">Đang tải...</div>
+    <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-else-if="history">
+      <!-- Header -->
+      <h1>Lịch sử giao dịch - {{ history.goalTitle }}</h1>
+      
+      <!-- Goal Info -->
+      <div class="goal-info">
+        <div class="info-item">
+          <span>Mục tiêu:</span>
+          <span>{{ history.goalAmount.toLocaleString('vi-VN') }} đ</span>
+        </div>
+        <div class="info-item">
+          <span>Đã tiết kiệm:</span>
+          <span>{{ history.savedAmount.toLocaleString('vi-VN') }} đ</span>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary">
+        <div class="summary-item">
+          <span>Tổng nạp:</span>
+          <span class="income">
+            {{ history.summary.totalDeposit.toLocaleString('vi-VN') }} đ
+          </span>
+        </div>
+        <div class="summary-item">
+          <span>Tổng rút:</span>
+          <span class="withdrawal">
+            {{ history.summary.totalWithdrawal.toLocaleString('vi-VN') }} đ
+          </span>
+        </div>
+        <div class="summary-item">
+          <span>Số giao dịch:</span>
+          <span>{{ history.summary.transactionCount }}</span>
+        </div>
+      </div>
+
+      <!-- Transactions List -->
+      <div class="transactions-list">
+        <h3>Danh sách giao dịch</h3>
+        <div v-if="history.transactions.length === 0" class="empty">
+          Chưa có giao dịch nào
+        </div>
+        <div 
+          v-else 
+          v-for="tx in history.transactions" 
+          :key="tx.transactionId"
+          class="transaction-item"
+        >
+          <div class="tx-icon">
+            {{ tx.type === 'INCOME' ? '⬇️' : '⬆️' }}
+          </div>
+          <div class="tx-info">
+            <div class="tx-name">{{ tx.name }}</div>
+            <div class="tx-date">
+              {{ new Date(tx.transactionDate).toLocaleDateString('vi-VN') }}
+            </div>
+            <div v-if="tx.note" class="tx-note">{{ tx.note }}</div>
+          </div>
+          <div :class="['tx-amount', tx.type === 'INCOME' ? 'income' : 'withdrawal']">
+            {{ tx.type === 'INCOME' ? '+' : '-' }}
+            {{ tx.amount.toLocaleString('vi-VN') }} đ
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+**UI Layout Suggestion:**
+
+```
+┌────────────────────────────────────────────┐
+│  Lịch sử giao dịch - Mua xe              ← │
+├────────────────────────────────────────────┤
+│  Mục tiêu: 50,000,000 đ                    │
+│  Đã tiết kiệm: 20,000,000 đ                │
+├────────────────────────────────────────────┤
+│  📊 Tổng hợp:                              │
+│  • Tổng nạp: 25,000,000 đ                 │
+│  • Tổng rút: 5,000,000 đ                  │
+│  • Số giao dịch: 15                        │
+├────────────────────────────────────────────┤
+│  📝 Danh sách giao dịch:                   │
+│                                            │
+│  ⬇️ Nạp tiền vào mục tiêu    +5,000,000 đ │
+│     20/11/2025                             │
+│                                            │
+│  ⬆️ Rút tiền từ mục tiêu     -1,000,000 đ │
+│     15/11/2025                             │
+│                                            │
+│  ...                                       │
+└────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1698,7 +2303,7 @@ curl -X DELETE http://localhost:8080/finance/v1/goals/a12b34c5-0000-0000-0000-00
 ```
 
 **Response:**
-```json
+```json 
 (Empty body - 200 OK)
 ```
 
