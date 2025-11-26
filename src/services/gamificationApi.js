@@ -85,7 +85,18 @@ export const getMyLeaderboardPosition = async (type = 'ALLTIME') => {
  * @returns {Promise<Array>} Array of challenges
  */
 export const getChallenges = async () => {
-    return apiRequest('/challenge');
+    const response = await apiRequest('/challenge');
+    return response?.result ?? response;
+};
+
+/**
+ * Get challenges filtered by approval status
+ * @param {string} status - PENDING | APPROVED | REJECTED
+ * @returns {Promise<Array>} Challenge list
+ */
+export const getChallengesByStatus = async (status = 'PENDING') => {
+    const response = await apiRequest(`/challenge/status/${status.toUpperCase()}`);
+    return response?.result ?? response ?? [];
 };
 
 /**
@@ -101,6 +112,19 @@ export const createChallenge = async (challengeData) => {
 };
 
 /**
+ * Update an existing challenge
+ * @param {string} challengeId
+ * @param {Object} challengeData
+ * @returns {Promise<Object>}
+ */
+export const updateChallenge = async (challengeId, challengeData) => {
+    return apiRequest(`/challenge/${challengeId}`, {
+        method: 'PUT',
+        body: challengeData,
+    });
+};
+
+/**
  * Delete a challenge (admin only)
  * @param {string} challengeId - Challenge ID
  * @returns {Promise<Object>} Deletion status
@@ -108,6 +132,30 @@ export const createChallenge = async (challengeData) => {
 export const deleteChallenge = async (challengeId) => {
     return apiRequest(`/challenge/${challengeId}`, {
         method: 'DELETE',
+    });
+};
+
+/**
+ * Resubmit a rejected challenge for approval
+ * @param {string} challengeId
+ * @returns {Promise<Object>}
+ */
+export const resubmitChallenge = async (challengeId) => {
+    return apiRequest(`/challenge/${challengeId}/resubmit`, {
+        method: 'POST',
+    });
+};
+
+/**
+ * Update approval status for a challenge (moderator)
+ * @param {string} challengeId
+ * @param {{status: 'APPROVED'|'REJECTED', note?: string}} approvalData
+ * @returns {Promise<Object>}
+ */
+export const updateChallengeApproval = async (challengeId, approvalData) => {
+    return apiRequest(`/challenge/${challengeId}/approval`, {
+        method: 'PATCH',
+        body: approvalData,
     });
 };
 
@@ -128,12 +176,60 @@ export const addReward = async (rewardData) => {
 };
 
 /**
- * Get user rewards
- * @param {string} userId - User ID
- * @returns {Promise<Object>} User reward details
+ * Get current user's rewards (from JWT token)
+ * @returns {Promise<Object>} User reward details { userId, totalScore, rewardDetail[] }
  */
-export const getUserRewards = async (userId) => {
-    return apiRequest(`/reward/${userId}`);
+export const getUserRewards = async () => {
+    return apiRequest('/reward');
+};
+
+/**
+ * Badge API
+ */
+
+/**
+ * Get current user's badges
+ * @returns {Promise<Object>} Badge list response { code, result[], message }
+ */
+export const getMyBadges = async () => {
+    return apiRequest('/badge/me');
+};
+
+/**
+ * Get all badges in the system (for admin/frontend display)
+ * @returns {Promise<Object>} Badge list response { code, result[], message }
+ */
+export const getAllBadges = async () => {
+    return apiRequest('/badge');
+};
+
+/**
+ * Challenge Progress API
+ */
+
+/**
+ * Get progress of a specific challenge
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<Object>} Challenge progress { code, result, message }
+ */
+export const getChallengeProgress = async (challengeId) => {
+    return apiRequest(`/challenge/${challengeId}/progress`);
+};
+
+/**
+ * Get active challenges for current user
+ * @returns {Promise<Object>} Active challenges response { code, result[], message }
+ */
+export const getActiveChallenges = async () => {
+    return apiRequest('/challenge/me/active');
+};
+
+/**
+ * Get completed challenges for current user
+ * @returns {Promise<Object>} Completed challenges response { code, result[], message }
+ */
+export const getCompletedChallenges = async () => {
+    return apiRequest('/challenge/me/completed');
 };
 
 /**

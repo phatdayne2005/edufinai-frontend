@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
+import './styles/responsive.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 // Import API test utilities (exposes to window for console testing)

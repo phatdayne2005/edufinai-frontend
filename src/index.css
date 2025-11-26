@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -10,4 +14,26 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Goal highlight animation */
+.goal-item.goal-highlight {
+  animation: goalHighlight 2s ease-in-out;
+  border-color: var(--color-primary, #4CAF50);
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+}
+
+@keyframes goalHighlight {
+  0% {
+    background-color: rgba(76, 175, 80, 0.1);
+    transform: scale(1);
+  }
+  50% {
+    background-color: rgba(76, 175, 80, 0.2);
+    transform: scale(1.02);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
 }
