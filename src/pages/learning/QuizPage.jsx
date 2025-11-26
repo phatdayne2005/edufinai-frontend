@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
 import { styles } from '../../styles/appStyles';
+import LevelUpNotification from '../../components/notifications/LevelUpNotification';
 
 const QuizPage = () => {
     const { slug } = useParams();
@@ -16,6 +17,8 @@ const QuizPage = () => {
     const [submitted, setSubmitted] = useState(false);
     const [score, setScore] = useState(0);
     const [enrollmentId, setEnrollmentId] = useState(null);
+    const [showLevelUpNotification, setShowLevelUpNotification] = useState(false);
+    const [levelUpData, setLevelUpData] = useState(null);
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         const fetchData = async () => {
@@ -114,6 +117,10 @@ const QuizPage = () => {
         // Update progress via new slug-based API
         const token = getToken();
         try {
+            // Get current learner profile before update
+            const profileBefore = await learningService.getLearnerProfile(token);
+            const oldLevel = profileBefore?.level;
+
             await learningService.updateMyEnrollmentProgressBySlug(token, slug, {
                 status: isPassed ? 'COMPLETED' : 'IN_PROGRESS',
                 progressPercent: 100, // Đã làm xong bài quiz
@@ -122,6 +129,16 @@ const QuizPage = () => {
                 correctAnswers: correctCount
             });
             console.log('Progress updated successfully!');
+
+            // Get updated profile to check if level changed
+            const profileAfter = await learningService.getLearnerProfile(token);
+            const newLevel = profileAfter?.level;
+
+            // Show level-up notification if level changed
+            if (oldLevel && newLevel && oldLevel !== newLevel) {
+                setLevelUpData({ oldLevel, newLevel });
+                setShowLevelUpNotification(true);
+            }
         } catch (error) {
             console.error('Failed to submit progress:', error);
             alert('Không thể lưu kết quả: ' + error.message);
@@ -137,108 +154,119 @@ const QuizPage = () => {
     const isPassed = score === maxPoints;
 
     return (
-        <div style={styles.page}>
-            <div style={styles.header}>
-                <button
-                    onClick={() => navigate(-1)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 16, color: '#666' }}
-                >
-                    <ArrowLeft size={20} /> Thoát
-                </button>
-                <h1 style={styles.headerTitle}>Kiểm tra kiến thức</h1>
-                <p style={styles.headerSubtitle}>Câu hỏi {currentQuestionIndex + 1}/{questions.length}</p>
-            </div>
+        <>
+            {/* Level Up Notification */}
+            {showLevelUpNotification && levelUpData && (
+                <LevelUpNotification
+                    oldLevel={levelUpData.oldLevel}
+                    newLevel={levelUpData.newLevel}
+                    onClose={() => setShowLevelUpNotification(false)}
+                />
+            )}
 
-            {!submitted ? (
-                <div style={{ ...styles.section, backgroundColor: 'var(--surface-card)', padding: 24, borderRadius: 16, border: '1px solid var(--border-subtle)', minHeight: 300 }}>
-                    <h3 style={{ fontSize: 18, marginBottom: 24, color: 'var(--text-primary)' }}>{currentQuestion.question}</h3>
+            <div style={styles.page}>
+                <div style={styles.header}>
+                    <button
+                        onClick={() => navigate(-1)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 16, color: '#666' }}
+                    >
+                        <ArrowLeft size={20} /> Thoát
+                    </button>
+                    <h1 style={styles.headerTitle}>Kiểm tra kiến thức</h1>
+                    <p style={styles.headerSubtitle}>Câu hỏi {currentQuestionIndex + 1}/{questions.length}</p>
+                </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {(currentQuestion.answer || currentQuestion.options || []).map((option, idx) => (
+                {!submitted ? (
+                    <div style={{ ...styles.section, backgroundColor: 'var(--surface-card)', padding: 24, borderRadius: 16, border: '1px solid var(--border-subtle)', minHeight: 300 }}>
+                        <h3 style={{ fontSize: 18, marginBottom: 24, color: 'var(--text-primary)' }}>{currentQuestion.question}</h3>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {(currentQuestion.answer || currentQuestion.options || []).map((option, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleAnswer(idx)}
+                                    style={{
+                                        padding: '16px',
+                                        borderRadius: '12px',
+                                        border: answers[currentQuestionIndex] === idx ? '2px solid #4CAF50' : '1px solid var(--border-subtle)',
+                                        backgroundColor: answers[currentQuestionIndex] === idx ? 'rgba(76, 175, 80, 0.1)' : 'var(--surface-app)',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        fontSize: 16,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {option}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
                             <button
-                                key={idx}
-                                onClick={() => handleAnswer(idx)}
-                                style={{
-                                    padding: '16px',
-                                    borderRadius: '12px',
-                                    border: answers[currentQuestionIndex] === idx ? '2px solid #4CAF50' : '1px solid var(--border-subtle)',
-                                    backgroundColor: answers[currentQuestionIndex] === idx ? 'rgba(76, 175, 80, 0.1)' : 'var(--surface-app)',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    fontSize: 16,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                {option}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
-                        <button
-                            onClick={handlePrev}
-                            disabled={currentQuestionIndex === 0}
-                            style={{
-                                padding: '10px 20px',
-                                borderRadius: 8,
-                                border: 'none',
-                                background: currentQuestionIndex === 0 ? 'var(--surface-muted)' : 'var(--surface-hover)',
-                                color: currentQuestionIndex === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
-                                cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
-                            }}
-                        >
-                            Trước
-                        </button>
-
-                        {isLastQuestion ? (
-                            <button
-                                onClick={handleSubmit}
-                                disabled={Object.keys(answers).length < questions.length}
+                                onClick={handlePrev}
+                                disabled={currentQuestionIndex === 0}
                                 style={{
                                     padding: '10px 20px',
                                     borderRadius: 8,
                                     border: 'none',
-                                    background: '#4CAF50',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    opacity: Object.keys(answers).length < questions.length ? 0.5 : 1
+                                    background: currentQuestionIndex === 0 ? 'var(--surface-muted)' : 'var(--surface-hover)',
+                                    color: currentQuestionIndex === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                                    cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
                                 }}
                             >
-                                Nộp bài
+                                Trước
                             </button>
-                        ) : (
-                            <button
-                                onClick={handleNext}
-                                style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#2196F3', color: '#fff', cursor: 'pointer' }}
-                            >
-                                Tiếp theo
-                            </button>
-                        )}
-                    </div>
-                </div>
-            ) : (
-                <div style={{ textAlign: 'center', padding: 40, backgroundColor: 'var(--surface-card)', borderRadius: 16, border: '1px solid var(--border-subtle)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
-                        {isPassed ? (
-                            <CheckCircle size={48} color="#4CAF50" />
-                        ) : (
-                            <XCircle size={48} color="#F44336" />
-                        )}
-                        <h2 style={{ fontSize: 28, margin: 0, color: 'var(--text-primary)' }}>
-                            {isPassed ? 'Chúc mừng!' : 'Cần cố gắng hơn!'}
-                        </h2>
-                    </div>
 
-                    <p style={{ fontSize: 18, color: 'var(--text-secondary)', marginBottom: 24 }}>
-                        Bạn đạt được <span style={{ fontWeight: 'bold', color: isPassed ? '#4CAF50' : '#F44336', fontSize: 24 }}>{score}/{maxPoints}</span> điểm.
-                    </p>
-                    <button onClick={() => navigate('/learning')} style={styles.addButton}>
-                        Quay về danh sách bài học
-                    </button>
-                </div>
-            )}
-        </div>
+                            {isLastQuestion ? (
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={Object.keys(answers).length < questions.length}
+                                    style={{
+                                        padding: '10px 20px',
+                                        borderRadius: 8,
+                                        border: 'none',
+                                        background: '#4CAF50',
+                                        color: '#fff',
+                                        cursor: 'pointer',
+                                        opacity: Object.keys(answers).length < questions.length ? 0.5 : 1
+                                    }}
+                                >
+                                    Nộp bài
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleNext}
+                                    style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#2196F3', color: '#fff', cursor: 'pointer' }}
+                                >
+                                    Tiếp theo
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ textAlign: 'center', padding: 40, backgroundColor: 'var(--surface-card)', borderRadius: 16, border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+                            {isPassed ? (
+                                <CheckCircle size={48} color="#4CAF50" />
+                            ) : (
+                                <XCircle size={48} color="#F44336" />
+                            )}
+                            <h2 style={{ fontSize: 28, margin: 0, color: 'var(--text-primary)' }}>
+                                {isPassed ? 'Chúc mừng!' : 'Cần cố gắng hơn!'}
+                            </h2>
+                        </div>
+
+                        <p style={{ fontSize: 18, color: 'var(--text-secondary)', marginBottom: 24 }}>
+                            Bạn đạt được <span style={{ fontWeight: 'bold', color: isPassed ? '#4CAF50' : '#F44336', fontSize: 24 }}>{score}/{maxPoints}</span> điểm.
+                        </p>
+                        <button onClick={() => navigate('/learning')} style={styles.addButton}>
+                            Quay về danh sách bài học
+                        </button>
+                    </div>
+                )}
+            </div>
+        </>
     );
 };
 

@@ -346,13 +346,13 @@ export const getStoredToken = () => {
 
 /**
  * Admin - Create User with Role - Tạo user mới với role
- * API: POST http://localhost:8080/auth/users/admin/users
+ * API: POST http://localhost:8080/auth/admin/users
  * Request: { username: string, password: string, firstName?: string, lastName?: string, email?: string, phone?: string, dob?: string, role: string }
  * Role: LEARNER, CREATOR, MOD, hoặc ADMIN
  * Response: { code: 1000, result: { ...userInfo } }
  */
 export const createUserWithRole = async (userData) => {
-    const response = await apiRequest('/users/admin/users', {
+    const response = await apiRequest('/admin/users', {
         method: 'POST',
         body: userData,
     }, true);
