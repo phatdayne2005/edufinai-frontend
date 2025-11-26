@@ -10,7 +10,8 @@ const fallbackConfig = {
     measurementId: "G-LRP5MCBBZF"
 };
 
-const firebaseConfig = {
+// Config from environment variables (with fallback)
+const envFirebaseConfig = {
     apiKey: process.env.REACT_APP_FIREBASE_API_KEY || fallbackConfig.apiKey,
     authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain,
     projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || fallbackConfig.projectId,
@@ -20,11 +21,13 @@ const firebaseConfig = {
     measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || fallbackConfig.measurementId,
 };
 
+// Config from global (service worker) - takes priority if available
 const globalFirebaseConfig =
     typeof globalThis !== 'undefined' && globalThis.__FIREBASE_CONFIG
         ? globalThis.__FIREBASE_CONFIG
         : null;
 
+// Final config: global config (from service worker) takes priority, otherwise use env config
 const firebaseConfig = globalFirebaseConfig || envFirebaseConfig;
 
 export const hasFirebaseEnvConfig =
