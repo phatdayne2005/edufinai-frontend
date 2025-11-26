@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminProtectedRoute from './components/auth/AdminProtectedRoute';
 import AppShell from './pages/app/AppShell';
@@ -16,54 +17,56 @@ import ModDashboard from './pages/mod/ModDashboard';
 
 const App = () => (
   <AuthProvider>
-    <AppProvider>
-      <Routes>
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/auth/register" element={<RegisterPage />} />
-        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route
-          path="/admin/dashboard"
-          element={(
-            <AdminProtectedRoute>
-              <AdminDashboard />
-            </AdminProtectedRoute>
-          )}
-        />
-        <Route
-          path="/creator/dashboard"
-          element={(
-            <ProtectedRoute>
-              <CreatorDashboard />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/mod/dashboard"
-          element={(
-            <ProtectedRoute>
-              <ModDashboard />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/profile/personal-info"
-          element={(
-            <ProtectedRoute>
-              <PersonalInfoPage />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/*"
-          element={(
-            <ProtectedRoute>
-              <AppShell />
-            </ProtectedRoute>
-          )}
-        />
-      </Routes>
-    </AppProvider>
+    <NotificationProvider>
+      <AppProvider>
+        <Routes>
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/register" element={<RegisterPage />} />
+          <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route
+            path="/admin/dashboard"
+            element={(
+              <AdminProtectedRoute>
+                <AdminDashboard />
+              </AdminProtectedRoute>
+            )}
+          />
+          <Route
+            path="/creator/dashboard"
+            element={(
+              <ProtectedRoute>
+                <CreatorDashboard />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/mod/dashboard"
+            element={(
+              <ProtectedRoute>
+                <ModDashboard />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/profile/personal-info"
+            element={(
+              <ProtectedRoute>
+                <PersonalInfoPage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/*"
+            element={(
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            )}
+          />
+        </Routes>
+      </AppProvider>
+    </NotificationProvider>
   </AuthProvider>
 );
 

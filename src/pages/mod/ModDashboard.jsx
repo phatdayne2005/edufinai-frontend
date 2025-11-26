@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield, CheckCircle, XCircle, Loader2, Eye, X, Clock, BarChart, Tag, User, Circle, AlertCircle, AlertTriangle, HelpCircle, RefreshCw, Target, Gift, CalendarDays } from 'lucide-react';
 import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { getChallengesByStatus, updateChallengeApproval } from '../../services/gamificationApi';
 
 const ModDashboard = () => {
   const navigate = useNavigate();
   const { getToken } = useAuth();
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification();
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedLesson, setSelectedLesson] = useState(null);
@@ -895,9 +897,9 @@ const ModDashboard = () => {
                         <div style={styles.metaItem}>
                           <Gift size={14} />
                           <span>{challenge.rewardScore || 0} điểm</span>
-                            {challenge.rewardBadgeCode && (
-                              <span style={styles.challengePill}>{challenge.rewardBadgeCode}</span>
-                            )}
+                          {challenge.rewardBadgeCode && (
+                            <span style={styles.challengePill}>{challenge.rewardBadgeCode}</span>
+                          )}
                         </div>
                         <div style={styles.metaItem}>
                           <CalendarDays size={14} />

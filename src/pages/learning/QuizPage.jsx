@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { styles } from '../../styles/appStyles';
 import LevelUpNotification from '../../components/notifications/LevelUpNotification';
 
@@ -10,6 +11,7 @@ const QuizPage = () => {
     const { slug } = useParams();
     const navigate = useNavigate();
     const { getToken } = useAuth();
+    const { showError } = useNotification();
 
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -141,7 +143,7 @@ const QuizPage = () => {
             }
         } catch (error) {
             console.error('Failed to submit progress:', error);
-            alert('Không thể lưu kết quả: ' + error.message);
+            showError('Không thể lưu kết quả: ' + error.message);
         }
     };
 
