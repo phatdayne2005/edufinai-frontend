@@ -20,7 +20,14 @@ const handleResponse = async (response) => {
 };
 
 export const learningService = {
-    // Learner APIs
+    // ============================================
+    // 1. LEARNER APIs
+    // ============================================
+
+    /**
+     * Get current learner profile with level and EXP percentage
+     * Response includes: id, level, totalExp, expPercent
+     */
     getLearnerProfile: async (token) => {
         const response = await fetch(`${API_BASE_URL}/learners/me`, {
             headers: getHeaders(token),
@@ -42,6 +49,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Get learners filtered by level
+     * @param level - BEGINNER | INTERMEDIATE | ADVANCED
+     */
     getLearnersByLevel: async (token, level) => {
         const response = await fetch(`${API_BASE_URL}/learners/level/${level}`, {
             headers: getHeaders(token),
@@ -49,7 +60,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
-    // Creator APIs
+    // ============================================
+    // 2. CREATOR APIs
+    // ============================================
+
     getCreatorProfile: async (token) => {
         const response = await fetch(`${API_BASE_URL}/creators/me`, {
             headers: getHeaders(token),
@@ -71,6 +85,9 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Get lessons created by current creator
+     */
     getMyLessons: async (token) => {
         const response = await fetch(`${API_BASE_URL}/creators/me/lessons`, {
             headers: getHeaders(token),
@@ -78,7 +95,13 @@ export const learningService = {
         return handleResponse(response);
     },
 
-    // Lesson APIs
+    // ============================================
+    // 3. LESSON APIs
+    // ============================================
+
+    /**
+     * Get all lessons (public endpoint, auth optional)
+     */
     getAllLessons: async (token) => {
         const response = await fetch(`${API_BASE_URL}/lessons`, {
             headers: getHeaders(token),
@@ -88,11 +111,14 @@ export const learningService = {
 
     getLessonById: async (token, id) => {
         const response = await fetch(`${API_BASE_URL}/lessons/${id}`, {
-            headers: getHeaders(token), // Auth is optional but good to pass if available
+            headers: getHeaders(token),
         });
         return handleResponse(response);
     },
 
+    /**
+     * Get lesson by slug (e.g., "introduction-to-budgeting")
+     */
     getLessonBySlug: async (token, slug) => {
         const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}`, {
             headers: getHeaders(token),
@@ -100,31 +126,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
-    updateLessonBySlug: async (token, slug, lessonData) => {
-        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}`, {
-            method: 'PUT',
-            headers: getHeaders(token),
-            body: JSON.stringify(lessonData),
-        });
-        return handleResponse(response);
-    },
-
-    submitLessonBySlug: async (token, slug) => {
-        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}/submit`, {
-            method: 'PUT',
-            headers: getHeaders(token),
-        });
-        return handleResponse(response);
-    },
-
-    deleteLessonBySlug: async (token, slug) => {
-        const response = await fetch(`${API_BASE_URL}/lessons/slug/${slug}`, {
-            method: 'DELETE',
-            headers: getHeaders(token),
-        });
-        return handleResponse(response);
-    },
-
+    /**
+     * Filter lessons by tag
+     * @param tag - BUDGETING | INVESTING | SAVING | DEBT | TAX
+     */
     filterLessonsByTag: async (token, tag) => {
         const response = await fetch(`${API_BASE_URL}/lessons/tags/${tag}`, {
             headers: getHeaders(token),
@@ -132,6 +137,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Filter lessons by difficulty
+     * @param difficulty - BASIC | INTERMEDIATE | ADVANCED
+     */
     filterLessonsByDifficulty: async (token, difficulty) => {
         const response = await fetch(`${API_BASE_URL}/lessons/difficulty/${difficulty}`, {
             headers: getHeaders(token),
@@ -139,6 +148,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Filter lessons by status
+     * @param status - DRAFT | PENDING | APPROVED | REJECTED
+     */
     filterLessonsByStatus: async (token, status) => {
         const response = await fetch(`${API_BASE_URL}/lessons/status/${status}`, {
             headers: getHeaders(token),
@@ -146,6 +159,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Create new lesson (Creator only)
+     * @param lessonData - { title, description, content, durationMinutes, difficulty, tags, quizJson, ... }
+     */
     createLesson: async (token, lessonData) => {
         const response = await fetch(`${API_BASE_URL}/lessons`, {
             method: 'POST',
@@ -155,6 +172,9 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Update lesson by ID (Creator only)
+     */
     updateLesson: async (token, lessonId, lessonData) => {
         const response = await fetch(`${API_BASE_URL}/lessons/${lessonId}`, {
             method: 'PUT',
@@ -164,6 +184,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Submit lesson for review (Creator only)
+     * Changes status from DRAFT to PENDING
+     */
     submitLesson: async (token, lessonId) => {
         const response = await fetch(`${API_BASE_URL}/lessons/${lessonId}/submit`, {
             method: 'PUT',
@@ -172,6 +196,9 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Delete lesson (Creator only)
+     */
     deleteLesson: async (token, lessonId) => {
         const response = await fetch(`${API_BASE_URL}/lessons/${lessonId}`, {
             method: 'DELETE',
@@ -180,7 +207,21 @@ export const learningService = {
         return handleResponse(response);
     },
 
-    // Enrollment APIs
+    // ============================================
+    // 4. ENROLLMENT APIs
+    // ============================================
+
+    /**
+     * Enroll in a lesson (Learner only)
+     * Validates level requirements:
+     * - BEGINNER can only enroll in BASIC
+     * - INTERMEDIATE can enroll in BASIC and INTERMEDIATE
+     * - ADVANCED can enroll in all
+     * 
+     * @param lessonId - UUID of the lesson
+     * @returns Enrollment object with earnedExp: 0
+     * @throws Error if level insufficient
+     */
     enrollInLesson: async (token, lessonId) => {
         const response = await fetch(`${API_BASE_URL}/enrollments`, {
             method: 'POST',
@@ -190,6 +231,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Get all enrollments for current learner
+     * Response includes: earnedExp, correctAnswers fields
+     */
     getMyEnrollments: async (token) => {
         const response = await fetch(`${API_BASE_URL}/enrollments`, {
             headers: getHeaders(token),
@@ -204,6 +249,19 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Update enrollment progress and earn EXP
+     * NEW in v2.0: Only earns EXP when improving best score
+     * 
+     * @param progressData - {
+     *   status: "IN_PROGRESS" | "COMPLETED",
+     *   progressPercent: 100,
+     *   score: 100,
+     *   addAttempt: 1,
+     *   correctAnswers: 5  // REQUIRED - number of correct answers
+     * }
+     * @returns GamificationRes with EXP earned info
+     */
     updateEnrollmentProgress: async (token, enrollmentId, progressData) => {
         const response = await fetch(`${API_BASE_URL}/enrollments/${enrollmentId}/progress`, {
             method: 'PUT',
@@ -213,7 +271,13 @@ export const learningService = {
         return handleResponse(response);
     },
 
-    // New slug-based enrollment APIs
+    /**
+     * Get enrollment for a specific lesson by slug
+     * Useful for checking if user is enrolled and their progress
+     * 
+     * @param slug - Lesson slug
+     * @returns Enrollment object or throws 404 if not enrolled
+     */
     getMyEnrollmentForLesson: async (token, slug) => {
         const response = await fetch(`${API_BASE_URL}/enrollments/lessons/${slug}/my-enrollment`, {
             headers: getHeaders(token),
@@ -221,6 +285,14 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Update enrollment progress by lesson slug
+     * Same as updateEnrollmentProgress but uses slug instead of enrollmentId
+     * 
+     * @param slug - Lesson slug
+     * @param progressData - Same as updateEnrollmentProgress
+     * @returns GamificationRes
+     */
     updateMyEnrollmentProgressBySlug: async (token, slug, progressData) => {
         const response = await fetch(`${API_BASE_URL}/enrollments/lessons/${slug}/my-enrollment/progress`, {
             method: 'PUT',
@@ -230,7 +302,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
-    // Moderator APIs
+    // ============================================
+    // 5. MODERATOR APIs
+    // ============================================
+
     getAllModerators: async (token) => {
         const response = await fetch(`${API_BASE_URL}/moderators`, {
             headers: getHeaders(token),
@@ -238,6 +313,10 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Get lessons for moderation filtering by status
+     * @param status - PENDING | APPROVED | REJECTED (default: PENDING)
+     */
     getModerationLessons: async (token, status = 'PENDING') => {
         const response = await fetch(`${API_BASE_URL}/moderators/lessons?status=${status}`, {
             headers: getHeaders(token),
@@ -252,6 +331,9 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Get lesson detail for moderation
+     */
     getLessonDetailForMod: async (token, lessonId) => {
         const response = await fetch(`${API_BASE_URL}/moderators/lessons/${lessonId}`, {
             headers: getHeaders(token),
@@ -259,6 +341,13 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    /**
+     * Approve or reject a lesson
+     * @param decisionData - {
+     *   status: "APPROVED" | "REJECTED",
+     *   commentByMod: "Feedback message (max 2000 chars)"
+     * }
+     */
     moderateLesson: async (token, lessonId, decisionData) => {
         const response = await fetch(`${API_BASE_URL}/moderators/lessons/${lessonId}/decision`, {
             method: 'POST',
@@ -268,4 +357,50 @@ export const learningService = {
         return handleResponse(response);
     },
 
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+
+    /**
+     * Helper function to check if learner can enroll based on level
+     * @param learnerLevel - BEGINNER | INTERMEDIATE | ADVANCED
+     * @param lessonDifficulty - BASIC | INTERMEDIATE | ADVANCED
+     * @returns boolean
+     */
+    canEnroll: (learnerLevel, lessonDifficulty) => {
+        const levelMap = {
+            'BEGINNER': ['BASIC'],
+            'INTERMEDIATE': ['BASIC', 'INTERMEDIATE'],
+            'ADVANCED': ['BASIC', 'INTERMEDIATE', 'ADVANCED']
+        };
+        return levelMap[learnerLevel]?.includes(lessonDifficulty) || false;
+    },
+
+    /**
+     * Get required level for a lesson difficulty
+     * @param difficulty - BASIC | INTERMEDIATE | ADVANCED
+     * @returns Required learner level
+     */
+    getRequiredLevel: (difficulty) => {
+        const requirementMap = {
+            'BASIC': 'BEGINNER',
+            'INTERMEDIATE': 'INTERMEDIATE',
+            'ADVANCED': 'ADVANCED'
+        };
+        return requirementMap[difficulty] || 'BEGINNER';
+    },
+
+    /**
+     * Get next level name
+     * @param currentLevel - BEGINNER | INTERMEDIATE | ADVANCED
+     * @returns Next level or null if already at max
+     */
+    getNextLevel: (currentLevel) => {
+        const levelProgression = {
+            'BEGINNER': 'INTERMEDIATE',
+            'INTERMEDIATE': 'ADVANCED',
+            'ADVANCED': null
+        };
+        return levelProgression[currentLevel];
+    }
 };

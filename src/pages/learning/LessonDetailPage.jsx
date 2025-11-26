@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, PlayCircle, CheckCircle, Clock, BookOpen, Award, TrendingUp, PiggyBank, CreditCard, DollarSign, HelpCircle, FileText, Tag, Circle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { styles } from '../../styles/appStyles';
 import Header from '../../components/layout/Header';
 
@@ -50,6 +51,7 @@ const LessonDetailPage = () => {
     const { slug } = useParams();
     const navigate = useNavigate();
     const { getToken } = useAuth();
+    const { showSuccess, showError } = useNotification();
     const [lesson, setLesson] = useState(null);
     const [enrollment, setEnrollment] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -103,10 +105,10 @@ const LessonDetailPage = () => {
         try {
             const newEnrollment = await learningService.enrollInLesson(token, lesson.id);
             setEnrollment(newEnrollment);
-            alert('Đã đăng ký học thành công!');
+            showSuccess('Đã đăng ký học thành công!');
         } catch (error) {
             console.error('Error enrolling:', error);
-            alert(`Không thể đăng ký bài học này: ${error.message}`);
+            showError(`Không thể đăng ký bài học này: ${error.message}`);
         }
     };
 

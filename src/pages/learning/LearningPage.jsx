@@ -170,21 +170,100 @@ const LearningPage = () => {
           boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
         }}>
           <p style={styles.progressLabel}>Hồ sơ học viên</p>
-          <div style={styles.progressStats}>
-            <div>
-              <h3 style={styles.progressNumber}>{learnerProfile.level || 'BEGINNER'}</h3>
-              <p style={styles.progressText}>Cấp độ</p>
+
+          {/* Level Badge */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{
+              display: 'inline-block',
+              padding: '8px 20px',
+              borderRadius: 20,
+              background: learnerProfile.level === 'BEGINNER'
+                ? 'linear-gradient(135deg, #4CAF50, #45a049)'
+                : learnerProfile.level === 'INTERMEDIATE'
+                  ? 'linear-gradient(135deg, #2196F3, #1976D2)'
+                  : 'linear-gradient(135deg, #9C27B0, #7B1FA2)',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: 16,
+              marginBottom: 8,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}>
+              {learnerProfile.level === 'BEGINNER' ? '🌱 BEGINNER'
+                : learnerProfile.level === 'INTERMEDIATE' ? '⭐ INTERMEDIATE'
+                  : '🏆 ADVANCED'}
             </div>
-            <div>
-              <h3 style={styles.progressNumber}>{learnerProfile.totalPointsLearning || 0}</h3>
-              <p style={styles.progressText}>Điểm tích lũy</p>
+            <p style={{
+              margin: 0,
+              fontSize: 13,
+              color: 'var(--text-muted)'
+            }}>
+              Cấp độ hiện tại
+            </p>
+          </div>
+
+          {/* EXP Progress Bar */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 8
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Tiến độ lên cấp
+              </span>
+              <span style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: '#667eea'
+              }}>
+                {learnerProfile.expPercent || 0}%
+              </span>
             </div>
-            <div>
-              <h3 style={styles.progressNumber}>
-                {lessons.filter(l => l.enrollment?.status === 'COMPLETED').length}
-              </h3>
-              <p style={styles.progressText}>Bài hoàn thành</p>
+
+            <div style={{
+              width: '100%',
+              height: 12,
+              backgroundColor: '#e0e0e0',
+              borderRadius: 20,
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${learnerProfile.expPercent || 0}%`,
+                background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: 20,
+                transition: 'width 0.5s ease',
+                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)'
+              }} />
             </div>
+
+            {learnerProfile.level !== 'ADVANCED' && (
+              <p style={{
+                margin: '8px 0 0 0',
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                fontStyle: 'italic'
+              }}>
+                {learnerProfile.expPercent >= 100
+                  ? '🎉 Đã đủ điểm để lên cấp!'
+                  : `Còn ${100 - (learnerProfile.expPercent || 0)}% nữa để lên ${learnerProfile.level === 'BEGINNER' ? 'INTERMEDIATE' : 'ADVANCED'
+                  }`
+                }
+              </p>
+            )}
+            {learnerProfile.level === 'ADVANCED' && (
+              <p style={{
+                margin: '8px 0 0 0',
+                fontSize: 12,
+                color: '#9C27B0',
+                fontWeight: 600
+              }}>
+                ⭐ Bạn đã đạt cấp độ cao nhất!
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -500,7 +579,7 @@ const LearningPage = () => {
           })
         )}
       </div>
-    </div>
+    </div >
   );
 };
 

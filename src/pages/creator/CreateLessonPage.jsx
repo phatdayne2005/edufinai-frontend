@@ -3,12 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { learningService } from '../../services/learningService';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { styles } from '../../styles/appStyles';
 
 const CreateLessonPage = () => {
     const navigate = useNavigate();
     const { lessonId } = useParams();
     const { getToken } = useAuth();
+    const { showSuccess, showError, showWarning, showConfirm } = useNotification();
     const isEdit = !!lessonId;
 
     const [formData, setFormData] = useState({
